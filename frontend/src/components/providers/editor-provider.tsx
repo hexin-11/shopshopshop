@@ -38,15 +38,20 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 		const loadProject = async () => {
 			try {
 				setIsLoading(true);
+				console.log("[EditorProvider] 1. Initializing GPU renderer...");
 				await initializeGpuRenderer();
+				console.log("[EditorProvider] 2. GPU renderer initialized. Is GPU available:", isGpuAvailable());
 				editor.renderer.setDegraded(!isGpuAvailable());
+				console.log("[EditorProvider] 3. Loading project with ID:", projectId);
 				await editor.project.loadProject({ id: projectId });
+				console.log("[EditorProvider] 4. Project loaded successfully.");
 
 				if (cancelled) return;
 
 				setIsLoading(false);
 				loadFontAtlas();
 			} catch (err) {
+				console.error("[EditorProvider] Error caught during loadProject:", err);
 				if (cancelled) return;
 
 				const isNotFound =
@@ -56,11 +61,14 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 
 				if (isNotFound) {
 					try {
+						console.log("[EditorProvider] Project not found. Creating a new project...");
 						const newProjectId = await editor.project.createNewProject({
 							name: "Untitled Project",
 						});
+						console.log("[EditorProvider] New project created successfully with ID:", newProjectId);
 						router.replace(`/projects/${newProjectId}`);
 					} catch (_createErr) {
+						console.error("[EditorProvider] Failed to create new project:", _createErr);
 						setError("Failed to create project");
 						setIsLoading(false);
 					}
