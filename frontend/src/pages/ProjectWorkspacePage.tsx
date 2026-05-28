@@ -1,5 +1,5 @@
 import Editor from "./OpenCutEditorPage";
 
-export default function ProjectWorkspacePage({ navigate }: { navigate: (route: "projects" | "analytics" | "dashboard") => void }) {
+export default function ProjectWorkspacePage({ navigate }: { navigate: (route: any) => void }) {
   return <Editor />;
 }
