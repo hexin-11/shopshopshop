@@ -1,0 +1,72 @@
+[
+  {
+    "id": "asset-earphone-main",
+    "fileName": "耳机主图-白底.png",
+    "type": "商品图片",
+    "category": "数码配件",
+    "tags": ["耳机", "白底", "主图"],
+    "uploader": "王艺",
+    "used": 12,
+    "mimeType": "image/png",
+    "size": 382120,
+    "url": null,
+    "createdAt": "2026-05-25T09:30:00.000Z",
+    "updatedAt": "2026-05-27T10:12:00.000Z"
+  },
+  {
+    "id": "asset-earphone-commute",
+    "fileName": "佩戴场景-通勤.mp4",
+    "type": "商品视频",
+    "category": "数码配件",
+    "tags": ["生活方式", "通勤"],
+    "uploader": "何鑫",
+    "used": 8,
+    "mimeType": "video/mp4",
+    "size": 4821120,
+    "url": null,
+    "createdAt": "2026-05-25T11:00:00.000Z",
+    "updatedAt": "2026-05-27T11:22:00.000Z"
+  },
+  {
+    "id": "asset-serum-texture",
+    "fileName": "精华液质地图.jpg",
+    "type": "生活方式图",
+    "category": "美妆护肤",
+    "tags": ["美妆", "质感"],
+    "uploader": "李明",
+    "used": 6,
+    "mimeType": "image/jpeg",
+    "size": 521004,
+    "url": null,
+    "createdAt": "2026-05-26T08:20:00.000Z",
+    "updatedAt": "2026-05-27T12:15:00.000Z"
+  },
+  {
+    "id": "asset-shoes-unbox",
+    "fileName": "跑鞋开箱参考.mp4",
+    "type": "参考视频",
+    "category": "运动户外",
+    "tags": ["开箱", "运动"],
+    "uploader": "陈琳",
+    "used": 4,
+    "mimeType": "video/mp4",
+    "size": 8221400,
+    "url": null,
+    "createdAt": "2026-05-26T15:45:00.000Z",
+    "updatedAt": "2026-05-27T12:30:00.000Z"
+  },
+  {
+    "id": "asset-promo-bgm",
+    "fileName": "轻快促销 BGM.wav",
+    "type": "音频 / BGM",
+    "category": "音频素材",
+    "tags": ["BGM", "促销"],
+    "uploader": "何鑫",
+    "used": 18,
+    "mimeType": "audio/wav",
+    "size": 2311440,
+    "url": null,
+    "createdAt": "2026-05-24T13:10:00.000Z",
+    "updatedAt": "2026-05-27T09:10:00.000Z"
+  }
+]

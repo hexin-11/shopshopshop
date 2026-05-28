@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, TerminalSquare, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { jobs } from "../data/mockData";
 import StatusBadge from "./StatusBadge";
 
@@ -7,6 +7,10 @@ export default function TaskQueuePanel({ open, onClose }: { open: boolean; onClo
   const [tab, setTab] = useState<"generating" | "history">("generating");
   const [expanded, setExpanded] = useState<string>(jobs[0].id);
   const visibleJobs = useMemo(() => jobs.filter((job) => job.type === tab), [tab]);
+
+  useEffect(() => {
+    if (open) setExpanded(visibleJobs[0]?.id ?? "");
+  }, [open, visibleJobs]);
 
   if (!open) return null;
 

@@ -28,6 +28,8 @@
 
 请注意命令是 `npm`，不是 `nmp`。
 
+前端：
+
 ```bash
 npm install
 npm run dev
@@ -40,6 +42,25 @@ http://localhost:5173
 ```
 
 如果提示 `vite is not recognized`，说明依赖还没有安装成功，需要先执行 `npm install`。
+
+素材库后端：
+
+```bash
+cd backend
+npm run dev
+```
+
+后端默认地址：
+
+```text
+http://localhost:8787
+```
+
+健康检查：
+
+```text
+http://localhost:8787/api/health
+```
 
 ## 代码结构
 
@@ -84,6 +105,14 @@ src/
     ProjectWorkspacePage.tsx
     AnalyticsPage.tsx
     SettingsPage.tsx
+backend/
+  src/
+    server.js
+  data/
+    assets.json
+  uploads/
+    .gitkeep
+  README.md
 ```
 
 ## 说明
