@@ -1,5 +1,5 @@
 export type RouteKey =
-  | "dashboard" | "assets" | "scripts" | "projects" | "analytics" | "settings";
+  | "dashboard" | "products" | "projects" | "settings";
 
 export const user = {
   name: "何鑫",
@@ -96,3 +96,132 @@ export const versions = [
   { name: "v3 替换素材", author: "王艺", time: "今天 09:12", note: "替换为生活方式素材" },
   { name: "v4 完成剪辑", author: "何鑫", time: "今天 11:31", note: "确认字幕和节奏" }
 ];
+
+
+// ── 商品目录 ─────────────────────────────────────────────────────────────────
+export const catalog = [
+  {
+    id: "prod-earphone",
+    name: "Havit H630BT 主动降噪耳机",
+    brand: "Havit",
+    category: "数码配件",
+    gradient: "from-blue-400 via-indigo-500 to-violet-500",
+    assetCount: 14,
+    scriptCount: 4,
+    projectCount: 2,
+    status: "已发布",
+    updatedAt: "2小时前",
+  },
+  {
+    id: "prod-serum",
+    name: "Glow Labs 维生素C精华液 30ml",
+    brand: "Glow Labs",
+    category: "美妆护肤",
+    gradient: "from-rose-300 via-pink-400 to-orange-300",
+    assetCount: 9,
+    scriptCount: 2,
+    projectCount: 1,
+    status: "制作中",
+    updatedAt: "4小时前",
+  },
+  {
+    id: "prod-bottle",
+    name: "AquaFlow 保温水杯 500ml",
+    brand: "AquaFlow",
+    category: "运动户外",
+    gradient: "from-cyan-400 via-teal-400 to-emerald-400",
+    assetCount: 7,
+    scriptCount: 1,
+    projectCount: 1,
+    status: "待审核",
+    updatedAt: "1天前",
+  },
+  {
+    id: "prod-shoes",
+    name: "Stride Pro 碳纤维跑鞋",
+    brand: "Stride Pro",
+    category: "运动户外",
+    gradient: "from-amber-400 via-orange-400 to-red-400",
+    assetCount: 5,
+    scriptCount: 1,
+    projectCount: 1,
+    status: "排队中",
+    updatedAt: "1天前",
+  },
+] as const;
+
+export type CatalogProduct = typeof catalog[number];
+
+// ── 各商品专属脚本（按商品 ID 索引）────────────────────────────────────────
+export const productScripts: Record<string, {
+  id: string;
+  versionLabel: string;
+  note: string;
+  author: string;
+  time: string;
+  content: { heading: string; body: string }[];
+}[]> = {
+  "prod-earphone": [
+    {
+      id: "s1", versionLabel: "v1 初稿", note: "偏基础结构，适合快速分镜。", author: "ShopClip AI", time: "昨天 14:20",
+      content: [
+        { heading: "开场 Hook", body: "通勤路上总被噪音打断？戴上 Havit H630BT，把注意力还给自己。" },
+        { heading: "卖点顺序", body: "主动降噪、柔软耳罩、长续航、低延迟连接。" },
+        { heading: "字幕文案", body: "沉浸音效，全天在线。主动降噪头戴式耳机，通勤、办公、学习都适合。" },
+        { heading: "结尾 CTA", body: "现在进入 TikTok Shop，查看今日优惠。" },
+      ],
+    },
+    {
+      id: "s2", versionLabel: "v2 修改 Hook", note: "增强前 3 秒吸引力。", author: "李明", time: "昨天 16:05",
+      content: [
+        { heading: "开场 Hook", body: "这款耳机让我在地铁里像是一个人坐着专机。" },
+        { heading: "卖点顺序", body: "主动降噪体验 → 佩戴舒适 → 续航优势 → 价格锚点。" },
+        { heading: "字幕文案", body: "40dB 主动降噪，30 小时续航，你值得拥有真正的安静。" },
+        { heading: "结尾 CTA", body: "点击购物车，今天下单立减 80 元。" },
+      ],
+    },
+    {
+      id: "s3", versionLabel: "v3 增强转化话术", note: "强化购买引导和平台优惠。", author: "何鑫", time: "今天 09:12",
+      content: [
+        { heading: "开场 Hook", body: "要不是这副耳机，我已经在 open office 疯掉了。" },
+        { heading: "卖点顺序", body: "降噪 → 佩戴 → 续航 → 限时券。" },
+        { heading: "字幕文案", body: "主动降噪 · 30H 长续航 · 60ms 低延迟。职场人必备，效率翻倍。" },
+        { heading: "结尾 CTA", body: "领券立减，今天是最后一天，不要错过。" },
+      ],
+    },
+  ],
+  "prod-serum": [
+    {
+      id: "s4", versionLabel: "v1 美白功效版", note: "主打成分透明度与功效。", author: "ShopClip AI", time: "2天前 11:00",
+      content: [
+        { heading: "开场 Hook", body: "用了两周，素颜也敢出门了。" },
+        { heading: "卖点顺序", body: "15% 维生素C浓度 → 烟酰胺协同 → 敏感肌可用 → 30天见效。" },
+        { heading: "字幕文案", body: "每天清晨一滴，告别暗黄，找回透明感。" },
+        { heading: "结尾 CTA", body: "点击主页链接，领专属优惠券。" },
+      ],
+    },
+  ],
+  "prod-bottle": [
+    {
+      id: "s5", versionLabel: "v1 户外场景版", note: "侧重生活方式与情感共鸣。", author: "ShopClip AI", time: "1天前 09:00",
+      content: [
+        { heading: "开场 Hook", body: "早上出门，到下班还是热的——这就是 AquaFlow 的承诺。" },
+        { heading: "卖点顺序", body: "真空保温 24H → 316 食品钢 → 一键弹盖 → 颜色多选。" },
+        { heading: "字幕文案", body: "陪你从晨跑到深夜，冷热随心，永远在线。" },
+        { heading: "结尾 CTA", body: "限时买一送一，今日截止。" },
+      ],
+    },
+  ],
+  "prod-shoes": [
+    {
+      id: "s6", versionLabel: "v1 新品推广版", note: "突出技术参数和运动感。", author: "ShopClip AI", time: "1天前 10:30",
+      content: [
+        { heading: "开场 Hook", body: "碳纤维中底不是专业运动员的专利，普通人也值得拥有。" },
+        { heading: "卖点顺序", body: "碳纤维推进板 → 氮气中底 → 透气网布 → 反光设计。" },
+        { heading: "字幕文案", body: "每一步都有回弹感，Stride Pro，跑得更远。" },
+        { heading: "结尾 CTA", body: "新品上线，前 500 名享 9 折。" },
+      ],
+    },
+  ],
+};
+
