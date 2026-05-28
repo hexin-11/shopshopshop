@@ -1,4 +1,25 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
+
+// Helper hook to subscribe to pathname/search changes
+function useLocationChange() {
+  const [loc, setLoc] = useState(() => ({
+    pathname: window.location.pathname,
+    search: window.location.search,
+  }));
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setLoc({
+        pathname: window.location.pathname,
+        search: window.location.search,
+      });
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  return loc;
+}
 
 export function useRouter() {
   const push = useCallback((url: string) => {
@@ -11,33 +32,29 @@ export function useRouter() {
     window.dispatchEvent(new PopStateEvent("popstate"));
   }, []);
 
-  return {
+  return useMemo(() => ({
     push,
     replace,
-    back: useCallback(() => {
-      window.history.back();
-    }, []),
-    forward: useCallback(() => {
-      window.history.forward();
-    }, []),
-    refresh: useCallback(() => {
-      window.location.reload();
-    }, []),
-    prefetch: useCallback(() => {}, []),
-  };
+    back: () => window.history.back(),
+    forward: () => window.history.forward(),
+    refresh: () => window.location.reload(),
+    prefetch: () => {},
+  }), [push, replace]);
 }
 
 export function useParams() {
-  const parts = window.location.pathname.split("/");
-  // The last segment of /projects/p-new is p-new, which is project_id
+  const { pathname } = useLocationChange();
+  const parts = pathname.split("/");
   const project_id = parts[parts.length - 1] || "p-new";
-  return { project_id };
+  return useMemo(() => ({ project_id }), [project_id]);
 }
 
 export function usePathname() {
-  return window.location.pathname;
+  const { pathname } = useLocationChange();
+  return pathname;
 }
 
 export function useSearchParams() {
-  return new URLSearchParams(window.location.search);
+  const { search } = useLocationChange();
+  return useMemo(() => new URLSearchParams(search), [search]);
 }
