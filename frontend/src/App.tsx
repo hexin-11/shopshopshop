@@ -3,45 +3,47 @@ import AppLayout from "./components/AppLayout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
-import AssetsPage from "./pages/AssetsPage";
-import ScriptsPage from "./pages/ScriptsPage";
+import ProductsPage from "./pages/ProductsPage";
+import ProductDetailPage from "./pages/ProductDetailPage";
 import VideoProjectsPage from "./pages/VideoProjectsPage";
 import ProjectWorkspacePage from "./pages/ProjectWorkspacePage";
-import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 import type { RouteKey } from "./data/mockData";
 import { getRouteKeyFromPath, routePaths } from "./lib/routes";
 
-type Route = RouteKey | "login" | "register" | "projectWorkspace";
+type Route = RouteKey | "login" | "register" | "projectWorkspace" | "productDetail";
 
 const routeFromLocation = (): Route => {
-  const pathname = window.location.pathname;
-  if (pathname === "/login") return "login";
-  if (pathname === "/register") return "register";
-  if (pathname.startsWith("/projects/")) return "projectWorkspace";
-  return getRouteKeyFromPath(pathname);
+  const p = window.location.pathname;
+  if (p === "/login") return "login";
+  if (p === "/register") return "register";
+  if (p.startsWith("/projects/")) return "projectWorkspace";
+  if (p.startsWith("/products/")) return "productDetail";
+  return getRouteKeyFromPath(p);
 };
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() => routeFromLocation());
+  const [selectedProductId, setSelectedProductId] = useState<string>("prod-earphone");
 
   useEffect(() => {
-    const handlePopState = () => setRoute(routeFromLocation());
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    const onPopState = () => setRoute(routeFromLocation());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   const navigate = (next: Route) => {
     setRoute(next);
     if (next === "login" || next === "register") {
-      window.history.pushState({}, "", `/${next}`);
-      return;
+      window.history.pushState({}, "", `/${next}`); return;
     }
     if (next === "projectWorkspace") {
-      window.history.pushState({}, "", "/projects/p-earphone");
-      return;
+      window.history.pushState({}, "", "/projects/p-earphone"); return;
     }
-    window.history.pushState({}, "", routePaths[next]);
+    if (next === "productDetail") {
+      window.history.pushState({}, "", `/products/${selectedProductId}`); return;
+    }
+    window.history.pushState({}, "", routePaths[next as RouteKey]);
   };
 
   const openProject = (projectId: string) => {
@@ -49,25 +51,41 @@ export default function App() {
     window.history.pushState({}, "", `/projects/${projectId}`);
   };
 
+  const selectProduct = (productId: string) => {
+    setSelectedProductId(productId);
+    setRoute("productDetail");
+    window.history.pushState({}, "", `/products/${productId}`);
+  };
+
   const page = useMemo(() => {
     switch (route) {
-      case "login": return <LoginPage navigate={navigate} />;
-      case "register": return <RegisterPage navigate={navigate} />;
-      case "assets": return <AssetsPage />;
-      case "scripts": return <ScriptsPage navigate={(r) => navigate(r)} />;
-      case "projects": return <VideoProjectsPage openProject={openProject} />;
+      case "login":         return <LoginPage navigate={navigate} />;
+      case "register":      return <RegisterPage navigate={navigate} />;
+      case "products":      return <ProductsPage onSelectProduct={selectProduct} />;
+      case "productDetail": return (
+        <ProductDetailPage
+          productId={selectedProductId}
+          onBack={() => navigate("products")}
+          openProject={openProject}
+          onQuickGenerate={() => navigate("products")}
+        />
+      );
+      case "projects":      return <VideoProjectsPage openProject={openProject} />;
       case "projectWorkspace": return <ProjectWorkspacePage navigate={(r) => navigate(r)} />;
-      case "analytics": return <AnalyticsPage />;
-      case "settings": return <SettingsPage />;
-      default: return <DashboardPage navigate={(r) => navigate(r)} />;
+      case "settings":      return <SettingsPage />;
+      default:              return <DashboardPage navigate={(r) => navigate(r)} />;
     }
-  }, [route]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, selectedProductId]);
 
-  if (route === "login" || route === "register") return page;
-  if (route === "projectWorkspace") return page;
+  // 全屏页面（不用 AppLayout）
+  if (route === "login" || route === "register" || route === "projectWorkspace") return page;
+
+  // 普通应用页面
+  const navCurrent: RouteKey = route === "productDetail" ? "products" : (route as RouteKey);
 
   return (
-    <AppLayout current={route} navigate={(next) => navigate(next)}>
+    <AppLayout current={navCurrent} navigate={(r) => navigate(r)}>
       {page}
     </AppLayout>
   );

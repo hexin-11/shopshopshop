@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -115,16 +117,109 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--background); color: var(--foreground); }
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
 button, input, select, textarea { font: inherit; }
 
-.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+/* 滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 999px; }
+::-webkit-scrollbar-track { background: transparent; }
+*:hover::-webkit-scrollbar-thumb { background: #D1D5DB; }
 
 @layer components {
-  .card { @apply rounded-lg border border-slate-200 bg-white shadow-soft; }
-  .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700; }
-  .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50; }
-  .input { @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100; }
-  .label { @apply text-sm font-medium text-slate-700; }
+  /* 基础卡片 */
+  .card {
+    @apply rounded-xl bg-white border border-[#E5E7EB];
+  }
+
+  /* 主按钮 (siter.io 亮蓝色) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg
+           bg-[#4684EE] px-[22px] py-[14px] text-[15px] font-medium text-white
+           transition-colors duration-300
+           hover:bg-[#346ED5];
+  }
+
+  /* 次级按钮 (带线白底) */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg
+           border border-[#E5E7EB] bg-white px-[22px] py-[14px] text-[15px] font-medium text-[#171719]
+           transition-colors duration-300
+           hover:bg-neutral-50;
+  }
+
+  /* Ghost 按钮 */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg
+           px-4 py-2 text-[15px] font-medium text-[#171719]/60
+           transition-colors duration-300
+           hover:text-[#171719] hover:bg-neutral-100;
+  }
+
+  /* 输入框 */
+  .input {
+    @apply w-full rounded-lg border border-[#E5E7EB] bg-white px-4 py-3 text-[15px]
+           outline-none transition-colors duration-300 text-[#171719]
+           placeholder:text-[#171719]/40
+           focus:border-[#4684EE];
+  }
+
+  /* 表单标签 */
+  .label { @apply text-[15px] font-medium text-[#171719]/90; }
+
+  /* 状态标记 */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-md bg-[#F0F5FF] px-2.5 py-1 text-xs font-medium text-[#4684EE];
+  }
+}
+
+/* 动画工具 */
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out both;
+}
+
+.animate-slide-up-card {
+  animation: slideUp 0.4s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 悬停卡片 */
+.card-hover {
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  @apply border-[#D1D5DB];
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+/* Siter 排版工具类 */
+.h1-siter {
+  @apply text-[42px] sm:text-[76px] leading-[100%] tracking-[-0.04em] font-[900];
+}
+.h2-siter {
+  @apply text-2xl sm:text-[36px] leading-tight tracking-tighter font-extrabold;
+}
+.p-siter-large {
+  @apply text-[21px] sm:text-[24px] leading-[34px] tracking-[-0.019em] opacity-70;
+}
+.p-siter {
+  @apply text-[16px] tracking-[-0.011em] opacity-70;
 }

@@ -1,24 +1,42 @@
-import { Bell, ChevronDown, Search } from "lucide-react";
-import MemberAvatarGroup from "./MemberAvatarGroup";
+import { Bell, Search } from "lucide-react";
 import { user } from "../data/mockData";
 
-export default function Topbar() {
+interface TopbarProps {
+  pageTitle?: string;
+}
+
+export default function Topbar({ pageTitle }: TopbarProps) {
   return (
-    <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-      <div className="flex h-16 items-center gap-4 px-4 lg:px-8">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input className="input pl-10" placeholder="搜索项目、素材、脚本、商品…" />
+    <header className="sticky top-0 z-10 h-14 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
+      <div className="flex h-full items-center gap-4 px-5 lg:px-8">
+        {/* 页面标题（小屏）或搜索框 */}
+        {pageTitle ? (
+          <h1 className="text-base font-semibold text-zinc-900">{pageTitle}</h1>
+        ) : (
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={15} />
+            <input
+              className="input pl-9 h-9 text-sm"
+              placeholder="搜索项目、商品、脚本…"
+            />
+          </div>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          {/* 通知 */}
+          <button className="relative rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100">
+            <Bell size={17} />
+            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-500" />
+          </button>
+
+          {/* 用户头像 */}
+          <button className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-zinc-50">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-xs font-semibold text-white">
+              {user.avatar}
+            </div>
+            <span className="hidden text-sm font-medium text-zinc-700 md:block">{user.name}</span>
+          </button>
         </div>
-        <button className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 md:flex">
-          耳机夏季促销 <ChevronDown size={16} />
-        </button>
-        <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><Bell size={18} /></button>
-        <MemberAvatarGroup />
-        <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">{user.avatar}</div>
-          <span className="hidden text-sm font-medium text-slate-700 md:block">{user.name}</span>
-        </button>
       </div>
     </header>
   );

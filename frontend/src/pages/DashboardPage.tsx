@@ -1,116 +1,222 @@
-import { Boxes, CheckCircle2, Clock3, FileVideo, Timer } from "lucide-react";
-import StatCard from "../components/StatCard";
-import ProjectTable from "../components/ProjectTable";
-import VideoPreviewCard from "../components/VideoPreviewCard";
-import TaskProgressCard from "../components/TaskProgressCard";
-import { activeWorkflows, dashboardMetrics, platformPerformance } from "../data/mockData";
+import {
+  ArrowUpRight,
+  Clapperboard,
+  Clock3,
+  Package,
+  TrendingUp,
+  FileVideo,
+  Zap,
+} from "lucide-react";
+import { dashboardMetrics, jobs, platformPerformance, catalog } from "../data/mockData";
 
-export default function DashboardPage({ navigate }: { navigate: (r: "projects" | "analytics") => void }) {
+export default function DashboardPage({
+  navigate,
+}: {
+  navigate: (r: "projects" | "products") => void;
+}) {
+  const activeJobs = jobs.filter((j) => j.type === "generating");
+
   return (
-    <div className="flex flex-col gap-6">
-      <section className="rounded-xl border border-brand-100 bg-gradient-to-r from-white to-brand-50 p-6 shadow-soft">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">欢迎回来，开始创建你的带货视频</h1>
-            <p className="mt-2 text-slate-600">上传商品素材，生成脚本，编辑分镜，并快速导出短视频。</p>
-          </div>
-          <button onClick={() => navigate("projects")} className="btn-primary">新建视频</button>
-        </div>
-      </section>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="视频项目" value="128" icon={FileVideo} />
-        <StatCard label="素材数量" value="542" icon={Boxes} />
-        <StatCard label="进行中任务" value="6" icon={Clock3} />
-        <StatCard label="平均生成时间" value="3m 42s" icon={Timer} />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {dashboardMetrics.map((metric) => (
-          <StatCard key={metric.label} label={metric.label} value={metric.value} delta={metric.delta} onClick={() => navigate("analytics")} />
-        ))}
-      </div>
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        {activeWorkflows.length > 0 && <section className="card p-5">
-          <div className="mb-5 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900">正在进行的流程</h2>
-            <button onClick={() => navigate("projects")} className="text-sm font-medium text-brand-600">继续创建</button>
-          </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            {activeWorkflows.map((item, index) => (
-              <div key={item.title} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">步骤 {index + 1}</span>
-                  <CheckCircle2 size={17} className={item.done ? "text-emerald-500" : "text-slate-300"} />
+    <div className="flex flex-col gap-10 animate-fade-in mx-auto w-full">
+      {/* ── 核心指标 ───────────────────────────── */}
+      <div className="grid grid-cols-2 gap-6 xl:grid-cols-4 text-left">
+        {dashboardMetrics.map((m, i) => {
+          return (
+            <button
+              key={m.label}
+              onClick={() => navigate("projects")}
+              style={{ animationDelay: `${i * 55}ms` }}
+              className="card card-hover p-8 animate-slide-up-card flex flex-col justify-between h-[180px]"
+            >
+              <p className="text-[16px] font-medium text-[#171719]/60">{m.label}</p>
+              <div>
+                <p className="text-[40px] font-bold tabular-nums tracking-tighter text-[#171719]">
+                  {m.value}
+                </p>
+                <div className="mt-2 flex items-center gap-1.5 text-[15px] font-medium text-[#171719]/40">
+                  <TrendingUp size={16} className="text-[#27AE60]" />
+                  <span className="text-[#27AE60]">{m.delta}</span>
                 </div>
-                <h3 className="mt-3 font-semibold text-slate-900">{item.title}</h3>
-                <p className="mt-1 text-sm leading-6 text-slate-500">{item.desc}</p>
               </div>
-            ))}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── 主 Bento ─────────────────────── */}
+      <div className="grid gap-6 xl:grid-cols-[2fr_1fr] text-left">
+        {/* 左：渲染任务 */}
+        <div
+          className="card animate-slide-up-card p-8"
+          style={{ animationDelay: "180ms" }}
+        >
+          <div className="mb-8 flex items-center justify-between">
+            <h2 className="h2-siter flex items-center gap-3">
+              <Zap size={24} className="text-[#4684EE]" />
+              正在渲染
+            </h2>
+            <button
+              onClick={() => navigate("projects")}
+              className="btn-ghost"
+            >
+              全部任务 <ArrowUpRight size={16} />
+            </button>
           </div>
-        </section>}
-        <section className="card p-5">
-          <h2 className="mb-4 font-semibold text-slate-900">平台发布概览</h2>
-          <div className="flex flex-col gap-3">
-            {platformPerformance.map((platform) => (
-              <div key={platform.platform} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ background: platform.color }}>{platform.logo}</div>
-                  <div>
-                  <p className="font-medium text-slate-900">{platform.platform}</p>
-                  <p className="text-xs text-slate-500">{platform.views} 播放</p>
+
+          <div className="space-y-4">
+            {activeJobs.map((job, i) => (
+              <div
+                key={job.id}
+                style={{ animationDelay: `${220 + i * 60}ms` }}
+                className="animate-slide-up-card rounded-xl border border-[#E5E7EB] bg-neutral-50 p-6 transition-colors hover:bg-neutral-100"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <span className="relative mt-1.5 flex h-2 w-2 shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4684EE] opacity-80" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4684EE]" />
+                    </span>
+                    <div>
+                      <p className="text-[17px] font-bold text-[#171719]">{job.name}</p>
+                      <p className="mt-1 text-[14px] text-[#171719]/50">{job.project}</p>
+                    </div>
                   </div>
+                  <span className="badge">{job.stage}</span>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold text-brand-700">{platform.conversion}</p>
-                  <p className="text-xs text-slate-500">转化率</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-        <ProjectTable />
-        <aside className="space-y-6">
-          <VideoPreviewCard />
-          <TaskProgressCard />
-          <div className="card p-5">
-            <h3 className="mb-4 font-semibold text-slate-900">团队动态</h3>
-            <div className="space-y-3 text-sm text-slate-600">
-              <p>李明修改了镜头 2 的字幕</p>
-              <p>王艺上传了 3 张商品图</p>
-              <p>何鑫评论了脚本版本 v2</p>
-            </div>
-          </div>
-        </aside>
-      </div>
-      <section className="card p-5">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-slate-900">多平台表现</h2>
-            <p className="mt-1 text-sm text-slate-500">横向对比 TikTok、YouTube 与 Instagram 的播放趋势。</p>
-          </div>
-          <button onClick={() => navigate("analytics")} className="btn-secondary">查看详细分析</button>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {platformPerformance.map((platform) => (
-            <div key={platform.platform} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ background: platform.color }}>{platform.logo}</div>
-                  <div>
-                    <p className="font-semibold text-slate-900">{platform.platform}</p>
-                    <p className="text-xs text-slate-500">{platform.views} 播放 · {platform.conversion} 转化</p>
+                {/* 进度条 */}
+                <div className="mt-6">
+                  <div className="mb-2 flex justify-between text-[14px] text-[#171719]/60">
+                    <span>渲染进度</span>
+                    <span className="font-bold text-[#171719]">{job.progress}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
+                    <div
+                      className="h-full rounded-full bg-[#4684EE] transition-all duration-700"
+                      style={{ width: `${job.progress}%` }}
+                    />
                   </div>
                 </div>
               </div>
-              <svg viewBox="0 0 240 96" className="h-24 w-full overflow-visible">
-                <polyline points="0,82 40,68 80,74 120,50 160,36 200,26 240,18" fill="none" stroke="#CBD5E1" strokeWidth="2" />
-                <polyline points={platform.series.map((value, index) => `${index * 40},${96 - value}`).join(" ")} fill="none" stroke={platform.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            ))}
+
+            {activeJobs.length === 0 && (
+              <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+                <Clock3 size={32} className="text-[#171719]/20" />
+                <p className="text-[16px] text-[#171719]/50">暂无正在进行的渲染任务</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 右：近期商品 */}
+        <div className="card animate-slide-up-card flex flex-col p-8" style={{ animationDelay: "270ms" }}>
+          <div className="mb-8 flex items-center justify-between">
+            <h2 className="h2-siter flex items-center gap-3">
+              <Package size={24} className="text-[#171719]/40" />
+              近期商品
+            </h2>
+            <button
+              onClick={() => navigate("products")}
+              className="btn-ghost"
+            >
+              全部 <ArrowUpRight size={16} />
+            </button>
+          </div>
+          
+          <div className="space-y-3 flex-1">
+            {catalog.slice(0, 5).map((prod) => (
+              <button
+                key={prod.id}
+                onClick={() => navigate("products")}
+                className="flex w-full items-center gap-4 rounded-xl p-3 text-left transition-colors hover:bg-neutral-50"
+              >
+                <div className="h-12 w-12 shrink-0 rounded-lg bg-neutral-100 flex items-center justify-center text-xl grayscale border border-[#E5E7EB]">
+                  📦
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[16px] font-bold text-[#171719]">{prod.name}</p>
+                  <p className="mt-0.5 text-[13px] text-[#171719]/40">
+                    {prod.scriptCount} 脚本 · {prod.projectCount} 项目
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── 底部：平台趋势 ─────────────────────────────────────── */}
+      <div
+        className="card animate-slide-up-card p-8 text-left max-w-none"
+        style={{ animationDelay: "320ms" }}
+      >
+        <div className="mb-8 flex items-center justify-between">
+          <h2 className="h2-siter">全网分发表现</h2>
+          <button
+            onClick={() => navigate("projects")}
+            className="btn-secondary"
+          >
+            <Clapperboard size={18} />
+            所有视频
+          </button>
+        </div>
+        
+        <div className="grid gap-6 lg:grid-cols-3">
+          {platformPerformance.map((platform, pi) => (
+            <div
+              key={platform.platform}
+              style={{ animationDelay: `${360 + pi * 60}ms` }}
+              className="animate-slide-up-card rounded-xl border border-[#E5E7EB] bg-neutral-50 p-6"
+            >
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <p className="text-[17px] font-bold text-[#171719]">{platform.platform}</p>
+                  <p className="mt-1 text-[13px] text-[#171719]/50">
+                    {platform.views} 播放 · {platform.conversion} 转化
+                  </p>
+                </div>
+              </div>
+              <svg viewBox="0 0 240 64" className="h-16 w-full overflow-visible">
+                <defs>
+                  <linearGradient id={`grad-${pi}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4684EE" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="#4684EE" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <polygon
+                  points={[
+                    ...platform.series.map((v, i) => `${i * 40},${64 - v * 0.64}`),
+                    `${(platform.series.length - 1) * 40},64`,
+                    "0,64",
+                  ].join(" ")}
+                  fill={`url(#grad-${pi})`}
+                />
+                <polyline
+                  points={platform.series
+                    .map((v, i) => `${i * 40},${64 - v * 0.64}`)
+                    .join(" ")}
+                  fill="none"
+                  stroke="#4684EE"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {platform.series.map((v, i) => (
+                  <circle
+                    key={i}
+                    cx={i * 40}
+                    cy={64 - v * 0.64}
+                    r="4"
+                    fill="#FFFFFF"
+                    stroke="#4684EE"
+                    strokeWidth="2"
+                  />
+                ))}
               </svg>
             </div>
           ))}
         </div>
-      </section>
+      </div>
     </div>
   );
 }
