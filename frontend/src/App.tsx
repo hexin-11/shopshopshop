@@ -17,7 +17,7 @@ const routeFromLocation = (): Route => {
   const p = window.location.pathname;
   if (p === "/login") return "login";
   if (p === "/register") return "register";
-  if (p.startsWith("/projects/")) return "projectWorkspace";
+  if (p.startsWith("/projects/") || p.startsWith("/editor/")) return "projectWorkspace";
   if (p.startsWith("/products/")) return "productDetail";
   return getRouteKeyFromPath(p);
 };
