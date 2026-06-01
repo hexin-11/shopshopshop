@@ -331,7 +331,7 @@ export function TimelineElement({
 	const handleRevealInMedia = ({ event }: { event: React.MouseEvent }) => {
 		event.stopPropagation();
 		if (hasMediaId(element)) {
-			requestRevealMedia(element.mediaId);
+			requestRevealMedia(element.mediaId, mediaAsset?.type);
 		}
 	};
 

@@ -1,21 +1,29 @@
-import { ArrowUpRight, Package, Plus, Search } from "lucide-react";
+import { ArrowUpRight, Package, Search, SlidersHorizontal, ArrowDownAZ } from "lucide-react";
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { catalog } from "../data/mockData";
+import { AddProductDialog } from "../components/product/AddProductDialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 
 export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id: string) => void }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
+  const [sortBy, setSortBy] = useState("latest");
+
+  const categories = ["全部", ...Array.from(new Set(catalog.map((p) => p.category)))];
 
   const filtered = catalog.filter((p) => {
     const matchQuery = !query || p.name.toLowerCase().includes(query.toLowerCase()) || p.brand.toLowerCase().includes(query.toLowerCase());
     const matchCat = category === "全部" || p.category === category;
     return matchQuery && matchCat;
+  }).sort((a, b) => {
+    if (sortBy === "name") return a.name.localeCompare(b.name);
+    // basic mock sort for "latest"
+    return 0;
   });
 
-  const categories = ["全部", ...Array.from(new Set(catalog.map((p) => p.category)))];
-
   return (
-    <div className="flex flex-col gap-8 animate-fade-in max-w-6xl mx-auto">
+    <div className="flex flex-col gap-8 max-w-6xl mx-auto">
 
       {/* 标题区 */}
       <div className="flex items-end justify-between">
@@ -23,10 +31,7 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
           <h1 className="text-[32px] font-bold text-[#171719] tracking-tight">商品库</h1>
           <p className="mt-2 text-[16px] text-[#171719]/60">集中管理您的所有带货商品，并生成专属视频。</p>
         </div>
-        <button className="btn-primary">
-          <Plus size={18} />
-          添加商品
-        </button>
+        <AddProductDialog />
       </div>
 
       {/* 搜索 + 分类过滤 */}
@@ -34,49 +39,74 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#171719]/40" size={18} />
           <input
-            className="input pl-12 h-[52px]"
+            className="input pl-12 h-[52px] w-full"
             placeholder="搜索商品名称或品牌…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className={`shrink-0 rounded-lg px-5 py-3 text-[15px] font-medium transition-colors ${
-                category === cat
-                  ? "bg-[#171719] text-white"
-                  : "bg-white border border-[#E5E7EB] text-[#171719]/70 hover:bg-neutral-50 hover:text-[#171719]"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="flex gap-3">
+          <div className="w-[160px]">
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="h-[52px] bg-white font-medium text-[15px]" icon={<SlidersHorizontal />}>
+                <SelectValue placeholder="选择分类" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-[160px]">
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="h-[52px] bg-white font-medium text-[15px]" icon={<ArrowDownAZ />}>
+                <SelectValue placeholder="排序方式" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="latest">最近更新</SelectItem>
+                <SelectItem value="name">按名称排序</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
       {/* 商品网格 */}
       {filtered.length > 0 ? (
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((product, index) => (
-            <button
+        <motion.div 
+          className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            hidden: { opacity: 0 },
+            visible: { opacity: 1, transition: { staggerChildren: 0.02 } }
+          }}
+        >
+          {filtered.map((product) => (
+            <motion.button
               key={product.id}
               onClick={() => onSelectProduct(product.id)}
-              style={{ animationDelay: `${index * 60}ms` }}
+              variants={{
+                hidden: { opacity: 0, y: 10 },
+                visible: { opacity: 1, y: 0 }
+              }}
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
               className={`
                 card card-hover group relative flex flex-col overflow-hidden text-left
-                animate-slide-up-card
               `}
             >
               {/* 封面 */}
-              <div className="h-40 bg-neutral-50 border-b border-[#E5E7EB] relative flex items-center justify-center">
-                <span className="text-5xl opacity-40 grayscale">📦</span>
-                <div className="absolute right-4 top-4">
+              <div className="h-48 bg-neutral-50 border-b border-[#E5E7EB] relative flex items-center justify-center overflow-hidden">
+                {product.mainImage ? (
+                  <img src={product.mainImage} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                ) : (
+                  <span className="text-5xl opacity-40 grayscale">📦</span>
+                )}
+                <div className="absolute right-4 top-4 bg-white/80 backdrop-blur-sm p-1.5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
                   <ArrowUpRight
-                    size={20}
-                    className="text-[#171719]/40 transition-colors group-hover:text-[#171719]"
+                    size={16}
+                    className="text-[#171719]"
                   />
                 </div>
               </div>
@@ -105,9 +135,9 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
                   <span>{product.projectCount} 个项目</span>
                 </div>
               </div>
-            </button>
+            </motion.button>
           ))}
-        </div>
+        </motion.div>
       ) : (
         <div className="card flex flex-col items-center justify-center gap-4 py-24 text-center">
           <Package size={40} className="text-[#171719]/20" />

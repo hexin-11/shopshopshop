@@ -82,6 +82,58 @@ async function generateImageThumbnail({
 	});
 }
 
+export async function uploadAssetToBackend(file: File, type: string): Promise<string | null> {
+	try {
+		const base64Content = await new Promise<string>((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onloadend = () => {
+				const result = reader.result as string;
+				resolve(result.split(",")[1]);
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+
+		let backendType = "商品图片";
+		if (type === "video") {
+			backendType = "商品视频";
+		} else if (type === "audio") {
+			backendType = "音频 / BGM";
+		}
+
+		const payload = {
+			fileName: file.name,
+			type: backendType,
+			category: "default",
+			uploader: "frontend",
+			contentBase64: base64Content,
+			mimeType: file.type,
+			size: file.size,
+		};
+
+		const res = await fetch("http://localhost:8787/api/assets", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify(payload),
+		});
+
+		if (!res.ok) {
+			throw new Error(`Upload failed with status ${res.status}`);
+		}
+
+		const data = await res.json();
+		if (data && data.url) {
+			return `http://localhost:8787${data.url}`;
+		}
+		return null;
+	} catch (error) {
+		console.warn("Backend sync failed, falling back to local storage:", error);
+		return null;
+	}
+}
+
 export async function processMediaAssets({
 	files,
 	onProgress,
@@ -164,11 +216,21 @@ export async function processMediaAssets({
 				duration = await getMediaDuration({ file });
 			}
 
+			let finalUrl = url;
+			try {
+				const cloudUrl = await uploadAssetToBackend(file, fileType);
+				if (cloudUrl) {
+					finalUrl = cloudUrl;
+				}
+			} catch (e) {
+				console.warn("Cloud sync failed, using local URL:", e);
+			}
+
 			processedAssets.push({
 				name: file.name,
 				type: fileType,
 				file,
-				url,
+				url: finalUrl,
 				thumbnailUrl,
 				duration,
 				width,

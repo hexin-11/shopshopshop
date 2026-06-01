@@ -11,13 +11,16 @@ import {
   Save,
   Send,
   Share2,
-  Sparkles,
+  Zap,
   Users,
+  CheckCircle2,
 } from "lucide-react";
 import { useState } from "react";
-import { assets, catalog, productScripts, projects } from "../data/mockData";
+import { motion, AnimatePresence } from "framer-motion";
+import { assets, catalog, productScripts, projects, dashboardMetrics } from "../data/mockData";
+import { CreateProjectWizard } from "../components/project/CreateProjectWizard";
 
-type Tab = "assets" | "scripts" | "projects";
+type Tab = "overview" | "assets" | "scripts";
 
 const assetTypeIcon: Record<string, string> = {
   "商品图片":   "🖼",
@@ -40,317 +43,342 @@ export default function ProductDetailPage({
   openProject,
   onQuickGenerate,
 }: ProductDetailPageProps) {
-  const [tab, setTab] = useState<Tab>("assets");
+  const [tab, setTab] = useState<Tab>("overview");
   const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null);
+  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
 
   const product = catalog.find((p) => p.id === productId) ?? catalog[0];
   const scripts = productScripts[productId] ?? [];
-  const activeScript = scripts.find((s) => s.id === selectedScriptId) ?? scripts[0];
-  const relatedProjects = projects.filter((p) =>
-    p.product === product.brand || p.name.includes(product.brand)
-  );
+  const activeScript = scripts.find((s) => s.id === selectedScriptId);
+
+  const toggleAsset = (assetName: string) => {
+    const newSet = new Set(selectedAssets);
+    if (newSet.has(assetName)) newSet.delete(assetName);
+    else newSet.add(assetName);
+    setSelectedAssets(newSet);
+  };
+
+  const handleCreateScriptFromAssets = () => {
+    setTab("scripts");
+    // future integration logic
+  };
 
   const tabs = [
-    { key: "assets",   label: "素材",   icon: Image,       count: product.assetCount },
-    { key: "scripts",  label: "AI 脚本",    icon: FileText,    count: product.scriptCount },
-    { key: "projects", label: "项目",   icon: Clapperboard, count: product.projectCount },
+    { key: "overview", label: "商品概览", icon: Package },
+    { key: "assets",   label: "项目素材库", icon: Image },
+    { key: "scripts",  label: "AI 脚本",    icon: FileText },
   ] as const;
 
   return (
-    <div className="flex flex-col gap-10 animate-fade-in max-w-6xl mx-auto">
-      {/* 面包屑 + 标题 */}
+    <div className="flex flex-col gap-8 animate-fade-in max-w-7xl mx-auto pb-24">
+      {/* 顶部导航与操作栏 */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <button
             onClick={onBack}
-            className="btn-ghost mt-2 p-2"
+            className="btn-ghost mt-2 p-2 hover:bg-neutral-100 rounded-full transition-colors"
             aria-label="返回"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <p className="text-[14px] font-medium text-[#171719]/40 mb-1">
-              商品库 <span className="mx-2 text-[#171719]/20">/</span>
-              <span className="text-[#171719]/80">{product.name}</span>
+            <p className="text-[14px] font-medium text-neutral-400 mb-1">
+              商品库 <span className="mx-2 text-neutral-200">/</span>
+              <span className="text-neutral-800">{product.name}</span>
             </p>
-            <h1 className="text-[32px] font-bold text-[#171719] tracking-tight">{product.name}</h1>
-            <div className="mt-3 flex items-center gap-3 text-[14px] font-medium text-[#171719]/50">
-              <Package size={16} />
-              <span>{product.brand}</span>
-              <span className="text-[#171719]/20">·</span>
-              <span>{product.category}</span>
-              <span className="text-[#171719]/20">·</span>
+            <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight">{product.name}</h1>
+            <div className="mt-3 flex items-center gap-3 text-sm font-medium text-neutral-500">
+              <span className="bg-neutral-100 px-2.5 py-0.5 rounded text-neutral-700">{product.brand}</span>
+              <span className="bg-neutral-100 px-2.5 py-0.5 rounded text-neutral-700">{product.category}</span>
+              <span className="text-neutral-300">·</span>
               <span>更新于 {product.updatedAt}</span>
             </div>
           </div>
         </div>
 
-        <button onClick={onQuickGenerate} className="btn-primary shrink-0">
-          <Sparkles size={18} />
-          一键生成视频
+        <button onClick={() => setIsWizardOpen(true)} className="btn-primary shrink-0 shadow-sm">
+          <Zap size={18} />
+          新建视频项目
         </button>
       </div>
 
-      {/* 数据带 */}
-      <div className="card p-10 flex items-center gap-16">
-        <div>
-          <p className="text-[15px] font-medium text-[#171719]/40">总素材数</p>
-          <p className="mt-2 text-[48px] font-bold tracking-tighter text-[#171719]">{product.assetCount}</p>
-        </div>
-        <div className="h-16 w-px bg-[#E5E7EB]" />
-        <div>
-          <p className="text-[15px] font-medium text-[#171719]/40">脚本方案</p>
-          <p className="mt-2 text-[48px] font-bold tracking-tighter text-[#171719]">{product.scriptCount}</p>
-        </div>
-        <div className="h-16 w-px bg-[#E5E7EB]" />
-        <div>
-          <p className="text-[15px] font-medium text-[#171719]/40">视频项目</p>
-          <p className="mt-2 text-[48px] font-bold tracking-tighter text-[#171719]">{product.projectCount}</p>
-        </div>
-      </div>
-
-      {/* Tab 切换 */}
-      <div className="flex gap-8 border-b border-[#E5E7EB]">
-        {tabs.map(({ key, label, icon: Icon, count }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key as Tab)}
-            className={`
-              group relative flex items-center gap-2 pb-5 text-[16px] font-bold transition-colors
-              ${tab === key
-                ? "text-[#171719]"
-                : "text-[#171719]/40 hover:text-[#171719]/80"
-              }
-            `}
-          >
-            <Icon size={18} />
-            <span>{label}</span>
-            <span className={`ml-1 rounded px-2 py-0.5 text-[12px] font-bold ${tab === key ? "bg-[#4684EE] text-white" : "bg-[#171719]/5 text-[#171719]/50 group-hover:bg-[#171719]/10"}`}>
-              {count}
-            </span>
-            {/* 激活指示线 */}
-            {tab === key && (
-              <span className="absolute bottom-[-1px] left-0 right-0 h-[3px] bg-[#4684EE]" />
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Tab 内容 ──────────────────────────────────────────────────── */}
-
-      {tab === "assets" && (
-        <div className="flex flex-col gap-8 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <h2 className="h2-siter text-[28px]">素材集合</h2>
-            <div className="flex gap-3">
-              <button className="btn-secondary">新建集合</button>
-              <button className="btn-primary">
-                <Plus size={18} />
-                上传素材
-              </button>
-            </div>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-            {assets.map((asset, i) => (
-              <div
-                key={asset.name}
-                style={{ animationDelay: `${i * 50}ms` }}
-                className="card group overflow-hidden transition-all duration-300 animate-slide-up"
-              >
-                <div className={`h-48 bg-neutral-50 border-b border-[#E5E7EB] flex items-center justify-center`}>
-                  <span className="text-5xl opacity-40 select-none grayscale">
-                    {assetTypeIcon[asset.type] ?? "📁"}
-                  </span>
-                </div>
-                <div className="p-6">
-                  <p className="truncate text-[18px] font-bold text-[#171719]">{asset.name}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {asset.tags.map((tag) => (
-                      <span key={tag} className="rounded bg-[#171719]/5 px-2.5 py-1 text-[12px] font-medium text-[#171719]/60">{tag}</span>
-                    ))}
-                  </div>
-                  <div className="mt-6 flex items-center justify-between text-[14px] font-medium text-[#171719]/40">
-                    <span>{asset.type}</span>
-                    <span>已使用 {asset.used} 次</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {tab === "scripts" && (
-        <div className="animate-fade-in">
-          {scripts.length === 0 ? (
-            <div className="card flex flex-col items-center gap-4 py-24 text-center">
-              <FileText size={48} className="text-[#171719]/20" />
-              <div>
-                <p className="h2-siter">还没有脚本</p>
-                <p className="mt-3 p-siter-large">让 AI 为这个商品创作第一份脚本。</p>
-              </div>
-              <button className="btn-primary mt-4">生成脚本</button>
-            </div>
-          ) : (
-            <div className="grid gap-8 xl:grid-cols-[340px_1fr]">
-              {/* 左：版本列表 */}
-              <aside className="flex flex-col gap-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-[20px] font-bold text-[#171719]">脚本版本</h2>
-                  <button className="btn-primary px-4 py-2 text-[14px]">
-                    <Sparkles size={16} />
-                    生成新版本
-                  </button>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {scripts.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedScriptId(s.id)}
-                      className={`
-                        rounded-xl border p-5 text-left transition-all duration-300
-                        ${(selectedScriptId ?? scripts[0]?.id) === s.id
-                          ? "border-[#4684EE] bg-[#4684EE]/5"
-                          : "border-[#E5E7EB] bg-white hover:bg-neutral-50"
-                        }
-                      `}
-                    >
-                      <p className={`text-[16px] font-bold ${(selectedScriptId ?? scripts[0]?.id) === s.id ? "text-[#4684EE]" : "text-[#171719]"}`}>
-                        {s.versionLabel}
-                      </p>
-                      <p className={`mt-2 text-[14px] ${(selectedScriptId ?? scripts[0]?.id) === s.id ? "text-[#4684EE]/80" : "text-[#171719]/50"}`}>{s.note}</p>
-                      <p className={`mt-4 text-[12px] font-medium ${(selectedScriptId ?? scripts[0]?.id) === s.id ? "text-[#4684EE]/60" : "text-[#171719]/40"}`}>{s.author} · {s.time}</p>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="card mt-2 p-6">
-                  <h3 className="mb-5 text-[12px] font-bold uppercase tracking-widest text-[#171719]/40">生成参数</h3>
-                  <div className="space-y-5">
-                    {[
-                      ["视频目标", ["种草转化", "品牌宣传", "新品发布"]],
-                      ["预计时长", ["15秒", "30秒", "60秒"]],
-                      ["目标语言", ["中文", "英文", "韩文"]],
-                      ["视频风格", ["生活方式", "专业测评", "休闲口播"]],
-                    ].map(([label, opts]) => (
-                      <label key={label as string} className="block">
-                        <span className="label block mb-2">{label as string}</span>
-                        <select className="input">
-                          {(opts as string[]).map((o) => <option key={o}>{o}</option>)}
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </aside>
-
-              {/* 右：脚本内容 */}
-              {activeScript && (
-                <div className="flex flex-col gap-6">
-                  <div className="card p-10">
-                    <div className="mb-10 flex items-start justify-between gap-6 border-b border-[#E5E7EB] pb-8">
-                      <div>
-                        <h2 className="text-[32px] font-extrabold tracking-tight text-[#171719]">{product.name}</h2>
-                        <p className="mt-2 text-[16px] text-[#171719]/50">当前版本：{activeScript.versionLabel}</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <button className="btn-secondary px-4 py-2 text-[14px]"><RefreshCw size={16} /> 重新生成</button>
-                        <button className="btn-secondary px-4 py-2 text-[14px]"><Save size={16} /> 保存</button>
-                        <button onClick={onQuickGenerate} className="btn-primary px-4 py-2 text-[14px]"><Send size={16} /> 生成视频</button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-10">
-                      {activeScript.content.map(({ heading, body }) => (
-                        <div key={heading} className="border-l-[3px] border-[#4684EE] pl-6">
-                          <h3 className="text-[14px] font-bold uppercase tracking-widest text-[#4684EE]">{heading}</h3>
-                          <p className="mt-4 text-[18px] leading-loose text-[#171719]/80">{body}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+      {/* 左右分栏布局：左侧信息，右侧功能 */}
+      <div className="grid lg:grid-cols-[320px_1fr] gap-8 mt-4 items-start">
+        
+        {/* 左侧固定信息栏 */}
+        <div className="flex flex-col gap-6 sticky top-8">
+          <div className="card overflow-hidden">
+            <div className="aspect-square bg-neutral-100 relative">
+              {product.mainImage ? (
+                <img src={product.mainImage} alt={product.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-6xl opacity-20 grayscale">📦</span>
                 </div>
               )}
             </div>
-          )}
-        </div>
-      )}
-
-      {tab === "projects" && (
-        <div className="flex flex-col gap-8 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <h2 className="h2-siter text-[28px]">关联视频项目</h2>
-            <button onClick={onQuickGenerate} className="btn-primary">
-              <Plus size={18} />
-              新建项目
-            </button>
+            <div className="p-5">
+              <h3 className="font-bold text-neutral-900 mb-2">商品详情</h3>
+              <p className="text-sm text-neutral-500 leading-relaxed">
+                这是 {product.name} 的内部参考详情。包含了基础尺寸、适用人群、主要卖点等信息，供 AI 脚本生成器参考。
+              </p>
+            </div>
           </div>
 
-          {relatedProjects.length === 0 ? (
-            <div className="card flex flex-col items-center gap-4 py-24 text-center">
-              <Clapperboard size={48} className="text-[#171719]/20" />
-              <div>
-                <p className="h2-siter">暂无视频项目</p>
-                <p className="mt-3 p-siter-large">先生成 AI 脚本，再一键制作视频。</p>
+          <div className="card p-5">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4">资产统计</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-neutral-600">素材数</span>
+                <span className="font-bold text-neutral-900">{product.assetCount}</span>
               </div>
-              <button className="btn-secondary mt-4" onClick={() => setTab("scripts")}>去生成脚本</button>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-neutral-600">脚本方案</span>
+                <span className="font-bold text-neutral-900">{product.scriptCount}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-neutral-600">视频项目</span>
+                <span className="font-bold text-neutral-900">{product.projectCount}</span>
+              </div>
             </div>
-          ) : (
-            <div className="grid gap-6 xl:grid-cols-2">
-              {relatedProjects.map((project) => (
-                <button
-                  key={project.id}
-                  onClick={() => openProject(project.id)}
-                  className="card p-8 text-left transition-all duration-300 hover:-translate-y-1"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-[20px] font-bold text-[#171719]">{project.name}</h3>
-                      <p className="mt-2 text-[14px] text-[#171719]/50">{project.ratio} · {project.updated}</p>
-                    </div>
-                    <span className="badge">{project.status}</span>
-                  </div>
-                  <div className="mt-8">
-                    <div className="mb-2 flex justify-between text-[14px] font-medium text-[#171719]/50">
-                      <span>生成进度</span>
-                      <span className="text-[#171719]">{project.progress}%</span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
-                      <div
-                        className="h-full rounded-full bg-[#4684EE]"
-                        style={{ width: `${project.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-8 flex items-center justify-between border-t border-[#E5E7EB] pt-5 text-[14px] font-medium text-[#171719]/50">
-                    <div className="flex items-center gap-2">
-                      {project.visibility === "Private" ? <Lock size={16} /> : <Share2 size={16} />}
-                      {project.visibility === "Private" ? "私密" : "公开协作"}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Users size={16} />
-                      <span>负责人: {project.owner}</span>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          
-          {relatedProjects.length > 0 && (
-            <div className="mt-6 flex justify-center">
-              <button
-                className="btn-secondary"
-                onClick={() => openProject(relatedProjects[0].id)}
-              >
-                <Play size={18} />
-                打开最近项目
-              </button>
-            </div>
-          )}
+          </div>
         </div>
-      )}
+
+        {/* 右侧核心工作区 */}
+        <div className="flex flex-col min-h-[600px] border border-neutral-200 bg-white rounded-2xl shadow-sm overflow-hidden">
+          {/* Tab 导航 */}
+          <div className="flex px-2 pt-2 border-b border-neutral-100 bg-neutral-50/50">
+            {tabs.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setTab(key as Tab)}
+                className={`
+                  relative flex items-center gap-2 px-6 py-4 text-sm font-bold transition-colors
+                  ${tab === key
+                    ? "text-blue-600 bg-white rounded-t-xl border-t border-x border-neutral-200/50"
+                    : "text-neutral-500 hover:text-neutral-800"
+                  }
+                `}
+                style={{
+                  marginBottom: tab === key ? "-1px" : "0"
+                }}
+              >
+                <Icon size={16} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="p-8">
+            <AnimatePresence mode="wait">
+              {/* 1. 商品概览 Tab */}
+              {tab === "overview" && (
+                <motion.div 
+                  key="overview"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col gap-8"
+                >
+                  <div className="grid grid-cols-2 gap-6">
+                    {dashboardMetrics.map((metric) => (
+                      <div key={metric.label} className="p-6 rounded-xl border border-neutral-100 bg-neutral-50/50">
+                        <p className="text-sm font-medium text-neutral-500 mb-2">{metric.label}</p>
+                        <div className="flex items-end justify-between">
+                          <span className="text-3xl font-extrabold text-neutral-900">{metric.value}</span>
+                          <span className={`text-sm font-bold ${metric.delta.startsWith('+') ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {metric.delta}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* 2. 项目素材库 Tab */}
+              {tab === "assets" && (
+                <motion.div 
+                  key="assets"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col gap-6 relative"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-3">
+                      <button className="btn-primary">
+                        <Plus size={16} />上传新素材
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {assets.map((asset, i) => (
+                      <motion.button
+                        key={asset.name}
+                        onClick={() => toggleAsset(asset.name)}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: i * 0.03 }}
+                        whileHover={{ y: -2 }}
+                        className={`
+                          group relative flex flex-col overflow-hidden transition-all duration-200 text-left
+                          rounded-xl border-2
+                          ${selectedAssets.has(asset.name) ? 'border-blue-500 bg-blue-50/20' : 'border-neutral-100 bg-white hover:border-neutral-300'}
+                        `}
+                      >
+                        <div className="absolute top-3 left-3 z-10">
+                          <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors
+                            ${selectedAssets.has(asset.name) ? 'bg-blue-500 border-blue-500 text-white' : 'border-neutral-300 bg-white/80'}
+                          `}>
+                            {selectedAssets.has(asset.name) && <CheckCircle2 size={14} />}
+                          </div>
+                        </div>
+                        <div className={`h-40 bg-neutral-50 border-b border-neutral-100 flex items-center justify-center ${selectedAssets.has(asset.name) ? 'opacity-80' : ''}`}>
+                          <span className="text-5xl opacity-40 select-none grayscale">
+                            {assetTypeIcon[asset.type] ?? "📁"}
+                          </span>
+                        </div>
+                        <div className="p-4">
+                          <p className="truncate text-base font-bold text-neutral-900">{asset.name}</p>
+                          <p className="mt-1 text-xs text-neutral-400">{asset.type} · 使用 {asset.used} 次</p>
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
+
+                  {/* 悬浮操作栏 */}
+                  <AnimatePresence>
+                    {selectedAssets.size > 0 && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-neutral-900 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-6 z-50"
+                      >
+                        <span className="text-sm font-medium">已选择 {selectedAssets.size} 个素材</span>
+                        <div className="w-px h-4 bg-neutral-700"></div>
+                        <button onClick={handleCreateScriptFromAssets} className="text-sm font-bold text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-2">
+                          <Zap size={16} /> 基于所选素材生成脚本
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+
+              {/* 3. AI 脚本 Tab */}
+              {tab === "scripts" && (
+                <motion.div 
+                  key="scripts"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col"
+                >
+                  {!activeScript ? (
+                    // 脚本列表视图
+                    <div className="flex flex-col gap-6">
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm text-neutral-500">选择一个脚本开始调整，或创建新版本。</p>
+                        <button onClick={() => setSelectedScriptId(scripts[0]?.id)} className="btn-primary">
+                          <Plus size={16} /> 生成新脚本
+                        </button>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {scripts.map((s, i) => (
+                          <motion.button
+                            key={s.id}
+                            onClick={() => setSelectedScriptId(s.id)}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                            className="p-6 rounded-xl border border-neutral-200 bg-white text-left hover:border-blue-400 hover:shadow-sm transition-all group"
+                          >
+                            <div className="flex justify-between items-start mb-4">
+                              <h3 className="text-lg font-bold text-neutral-900 group-hover:text-blue-600 transition-colors">{s.versionLabel}</h3>
+                              <span className="text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-500">{s.content.length} 个分镜</span>
+                            </div>
+                            <p className="text-sm text-neutral-500 mb-6 line-clamp-2">{s.note}</p>
+                            <div className="flex items-center justify-between text-xs font-medium text-neutral-400 border-t border-neutral-100 pt-4">
+                              <span>{s.author}</span>
+                              <span>{s.time}</span>
+                            </div>
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    // 对话式生成视图
+                    <motion.div 
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="grid xl:grid-cols-[300px_1fr] gap-8"
+                    >
+                      <div className="flex flex-col gap-4">
+                        <button onClick={() => setSelectedScriptId(null)} className="text-sm font-bold text-neutral-400 hover:text-neutral-800 flex items-center gap-2 mb-4 transition-colors">
+                          <ArrowLeft size={16} /> 返回列表
+                        </button>
+                        <div className="p-5 rounded-xl bg-blue-50/50 border border-blue-100">
+                          <h4 className="font-bold text-blue-900 mb-2 flex items-center gap-2"><Zap size={16} /> 脚本助手</h4>
+                          <p className="text-sm text-blue-700/80 mb-4">
+                            “我已经为您生成了这段 {activeScript.content.length * 5} 秒的带货分镜。您可以随时要求我调整某个特定镜头的语气。”
+                          </p>
+                          <textarea className="input w-full resize-none text-sm" placeholder="例如：将第二个分镜改得更情绪化一些..." rows={3}></textarea>
+                          <button className="btn-primary w-full mt-3"><Send size={16} /> 发送</button>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col gap-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <h3 className="text-xl font-bold text-neutral-900">{activeScript.versionLabel}</h3>
+                          <div className="flex gap-2">
+                            <button className="btn-secondary px-3 py-1.5"><Save size={16} /> 保存</button>
+                            <button onClick={() => setIsWizardOpen(true)} className="btn-primary px-3 py-1.5"><Play size={16} /> 从此脚本新建项目</button>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          {activeScript.content.map((shot, index) => (
+                            <motion.div 
+                              key={index} 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                              className="flex gap-4"
+                            >
+                              {/* 素材占位映射框 */}
+                              <button className="w-32 h-24 shrink-0 rounded-lg border-2 border-dashed border-neutral-200 bg-neutral-50 flex flex-col items-center justify-center text-neutral-400 hover:border-blue-400 hover:text-blue-500 transition-colors">
+                                <Image size={20} className="mb-1" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">指定素材</span>
+                              </button>
+                              
+                              {/* 文本内容 */}
+                              <div className="flex-1 p-5 rounded-xl border border-neutral-200 bg-white hover:border-neutral-300 transition-colors group cursor-text">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-widest">分镜 {index + 1} - {shot.heading}</span>
+                                  <span className="text-xs font-medium text-neutral-400">约 5s</span>
+                                </div>
+                                <p className="text-base text-neutral-700 leading-relaxed group-hover:text-neutral-900">{shot.body}</p>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+      <CreateProjectWizard open={isWizardOpen} onOpenChange={setIsWizardOpen} />
     </div>
   );
 }

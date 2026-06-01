@@ -111,6 +111,7 @@ export const catalog = [
     projectCount: 2,
     status: "已发布",
     updatedAt: "2小时前",
+    mainImage: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80",
   },
   {
     id: "prod-serum",
@@ -123,6 +124,7 @@ export const catalog = [
     projectCount: 1,
     status: "制作中",
     updatedAt: "4小时前",
+    mainImage: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&q=80",
   },
   {
     id: "prod-bottle",
@@ -135,6 +137,7 @@ export const catalog = [
     projectCount: 1,
     status: "待审核",
     updatedAt: "1天前",
+    mainImage: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&q=80",
   },
   {
     id: "prod-shoes",
@@ -147,6 +150,7 @@ export const catalog = [
     projectCount: 1,
     status: "排队中",
     updatedAt: "1天前",
+    mainImage: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80",
   },
 ] as const;
 

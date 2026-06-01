@@ -1,8 +1,9 @@
 import { createServer } from "node:http";
 import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { extname, join } from "node:path";
+import { extname, join, basename } from "node:path";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createDatabaseAssetStore } from "./storage/databaseAssetStore.js";
 import { createJsonAssetStore } from "./storage/jsonAssetStore.js";
@@ -196,6 +197,55 @@ async function handleApi(req, res) {
   if (req.method === "OPTIONS") return sendNoContent(res);
   if (pathname === "/api/health" && req.method === "GET") {
     return sendJson(res, 200, { status: "ok", service: "shopclip-assets", store: assetStore.name, time: new Date().toISOString() });
+  }
+
+  if (pathname === "/api/render-video" && req.method === "POST") {
+    let payload;
+    try {
+      payload = await readBody(req);
+    } catch (error) {
+      return badRequest(res, error.message);
+    }
+    const { variables, settings } = payload;
+    if (!variables) {
+      return badRequest(res, "variables 必填");
+    }
+
+    const inputJsonPath = join(uploadDir, `render-input-${randomUUID()}.json`);
+    await writeFile(inputJsonPath, JSON.stringify({ variables, settings }));
+
+    const renderServerDir = join(rootDir, "twick-src", "packages", "render-server");
+    const child = spawn("npx", ["tsx", "src/run-cli.ts", inputJsonPath, uploadDir], {
+      cwd: renderServerDir,
+      shell: true,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (data) => { stdout += data.toString(); });
+    child.stderr.on("data", (data) => { stderr += data.toString(); });
+
+    child.on("close", async (code) => {
+      await unlink(inputJsonPath).catch(() => {});
+
+      if (code !== 0) {
+        console.error("Render CLI error:", stderr);
+        return sendJson(res, 500, { success: false, error: stderr || "渲染视频失败" });
+      }
+
+      const match = stdout.match(/RENDER_OUTPUT_PATH:(.+)/);
+      if (!match) {
+        return sendJson(res, 500, { success: false, error: "未找到渲染输出路径，日志: " + stdout });
+      }
+
+      const finalPath = match[1].trim();
+      const filename = basename(finalPath);
+      return sendJson(res, 200, {
+        success: true,
+        downloadUrl: `http://localhost:8787/uploads/${filename}`,
+      });
+    });
+    return;
   }
 
   if (pathname === "/api/assets/meta/filters" && req.method === "GET") {

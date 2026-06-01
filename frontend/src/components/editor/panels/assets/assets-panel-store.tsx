@@ -4,7 +4,6 @@ import { persist } from "zustand/middleware";
 import {
 	ArrowRightDoubleIcon,
 	ClosedCaptionIcon,
-	Folder03Icon,
 	Happy01Icon,
 	HeadphonesIcon,
 	MagicWand05Icon,
@@ -12,17 +11,26 @@ import {
 	Settings01Icon,
 	SlidersHorizontalIcon,
 	ColorsIcon,
+	Video01Icon,
+	Image02Icon,
+	MusicNote03Icon,
+	TextFontIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 
 export const TAB_KEYS = [
-	"media",
-	"sounds",
+	"video",
+	"image",
+	"audio",
 	"text",
-	"stickers",
+	"text-style",
+	"emoji",
+	"shape",
 	"effects",
 	"transitions",
 	"captions",
+	"generate-media",
+	"sounds",
 	"adjustment",
 	"settings",
 ] as const;
@@ -36,41 +44,61 @@ const createHugeiconsIcon =
 	);
 
 export const tabs = {
-	media: {
-		icon: createHugeiconsIcon({ icon: Folder03Icon }),
-		label: "Media",
+	video: {
+		icon: createHugeiconsIcon({ icon: Video01Icon }),
+		label: "视频",
 	},
-	sounds: {
-		icon: createHugeiconsIcon({ icon: HeadphonesIcon }),
-		label: "Sounds",
+	image: {
+		icon: createHugeiconsIcon({ icon: Image02Icon }),
+		label: "图片",
+	},
+	audio: {
+		icon: createHugeiconsIcon({ icon: MusicNote03Icon }),
+		label: "音频",
 	},
 	text: {
 		icon: createHugeiconsIcon({ icon: TextIcon }),
-		label: "Text",
+		label: "文本",
 	},
-	stickers: {
+	"text-style": {
+		icon: createHugeiconsIcon({ icon: TextFontIcon }),
+		label: "样式",
+	},
+	emoji: {
 		icon: createHugeiconsIcon({ icon: Happy01Icon }),
-		label: "Stickers",
+		label: "表情",
+	},
+	shape: {
+		icon: createHugeiconsIcon({ icon: ColorsIcon }),
+		label: "形状",
 	},
 	effects: {
 		icon: createHugeiconsIcon({ icon: MagicWand05Icon }),
-		label: "Effects",
+		label: "特效",
 	},
 	transitions: {
 		icon: createHugeiconsIcon({ icon: ArrowRightDoubleIcon }),
-		label: "Transitions",
+		label: "转场",
 	},
 	captions: {
 		icon: createHugeiconsIcon({ icon: ClosedCaptionIcon }),
-		label: "Captions",
+		label: "字幕",
+	},
+	"generate-media": {
+		icon: createHugeiconsIcon({ icon: MagicWand05Icon }),
+		label: "AI 生成",
+	},
+	sounds: {
+		icon: createHugeiconsIcon({ icon: HeadphonesIcon }),
+		label: "音效",
 	},
 	adjustment: {
 		icon: createHugeiconsIcon({ icon: SlidersHorizontalIcon }),
-		label: "Adjustment",
+		label: "调整",
 	},
 	settings: {
 		icon: createHugeiconsIcon({ icon: Settings01Icon }),
-		label: "Settings",
+		label: "设置",
 	},
 } satisfies Record<
 	Tab,
@@ -85,7 +113,7 @@ interface AssetsPanelStore {
 	activeTab: Tab;
 	setActiveTab: (tab: Tab) => void;
 	highlightMediaId: string | null;
-	requestRevealMedia: (mediaId: string) => void;
+	requestRevealMedia: (mediaId: string, type?: "video" | "image" | "audio") => void;
 	clearHighlight: () => void;
 
 	/* Media */
@@ -99,11 +127,11 @@ interface AssetsPanelStore {
 export const useAssetsPanelStore = create<AssetsPanelStore>()(
 	persist(
 		(set) => ({
-			activeTab: "media",
+			activeTab: "video",
 			setActiveTab: (tab) => set({ activeTab: tab }),
 			highlightMediaId: null,
-			requestRevealMedia: (mediaId) =>
-				set({ activeTab: "media", highlightMediaId: mediaId }),
+			requestRevealMedia: (mediaId, type) =>
+				set({ activeTab: type || "video", highlightMediaId: mediaId }),
 			clearHighlight: () => set({ highlightMediaId: null }),
 			mediaViewMode: "grid",
 			setMediaViewMode: (mode) => set({ mediaViewMode: mode }),

@@ -531,6 +531,24 @@ export class ProjectManager {
 		this.editor.save.markDirty();
 	}
 
+	async updateMetadataFields(fields: Partial<TProjectMetadata>): Promise<void> {
+		if (!this.active) return;
+
+		const updatedProject: TProject = {
+			...this.active,
+			metadata: {
+				...this.active.metadata,
+				...fields,
+				updatedAt: new Date(),
+			},
+		};
+		this.active = updatedProject;
+		this.notify();
+		this.updateMetadata(updatedProject);
+		this.editor.save.markDirty();
+		await storageService.saveProject({ project: updatedProject });
+	}
+
 	async prepareExit(): Promise<void> {
 		if (!this.active) return;
 

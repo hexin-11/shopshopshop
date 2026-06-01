@@ -37,6 +37,7 @@
     "culori": "^4.0.2",
     "embla-carousel-react": "^8.5.1",
     "eventemitter3": "^5.0.1",
+    "framer-motion": "^12.40.0",
     "lucide-react": "^0.468.0",
     "mediabunny": "^1.29.1",
     "motion": "^12.18.1",

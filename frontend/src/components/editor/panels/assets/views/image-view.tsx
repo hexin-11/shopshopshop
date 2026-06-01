@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState } from "react";
 import { PanelView } from "@/components/editor/panels/assets/views/base-panel";
 import { MediaDragOverlay } from "@/components/editor/panels/assets/drag-overlay";
@@ -54,12 +53,11 @@ import {
 	LeftToRightListDashIcon,
 	SortingOneNineIcon,
 	Image02Icon,
-	MusicNote03Icon,
-	Video01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import Image from "next/image";
 
-export function MediaView() {
+export function ImageView() {
 	const editor = useEditor();
 	const mediaFiles = useEditor((e) => e.media.getAssets());
 	const activeProject = useEditor((e) => e.project.getActive());
@@ -95,15 +93,20 @@ export function MediaView() {
 						onProgress: (progress: { progress: number }) =>
 							setProgress(progress.progress),
 					});
-					for (const asset of processedAssets) {
+					const imageAssets = processedAssets.filter(asset => asset.type === "image");
+					if (imageAssets.length === 0) {
+						toast.warning("没有有效的图片文件");
+						return { uploadedCount: 0, assetNames: [] };
+					}
+					for (const asset of imageAssets) {
 						await editor.media.addMediaAsset({
 							projectId: activeProject.metadata.id,
 							asset,
 						});
 					}
 					return {
-						uploadedCount: processedAssets.length,
-						assetNames: processedAssets.map((asset) => asset.name),
+						uploadedCount: imageAssets.length,
+						assetNames: imageAssets.map((asset) => asset.name),
 					};
 				},
 			});
@@ -117,7 +120,7 @@ export function MediaView() {
 
 	const { isDragOver, dragProps, openFilePicker, fileInputProps } =
 		useFileUpload({
-			accept: "image/*,video/*,audio/*",
+			accept: "image/*",
 			multiple: true,
 			onFilesSelected: (files) => processFiles({ files }),
 		});
@@ -149,7 +152,8 @@ export function MediaView() {
 	};
 
 	const filteredMediaItems = useMemo(() => {
-		const filtered = mediaFiles.filter((item) => !item.ephemeral);
+		// Filter strictly to images
+		const filtered = mediaFiles.filter((item) => !item.ephemeral && item.type === "image");
 
 		filtered.sort((a, b) => {
 			let valueA: string | number;
@@ -183,6 +187,7 @@ export function MediaView() {
 
 		return filtered;
 	}, [mediaFiles, mediaSortBy, mediaSortOrder]);
+
 	const orderedMediaIds = useMemo(() => {
 		return filteredMediaItems.map((item) => item.id);
 	}, [filteredMediaItems]);
@@ -192,7 +197,7 @@ export function MediaView() {
 			<input {...fileInputProps} />
 
 			<PanelView
-				title="素材库"
+				title="图片库"
 				actions={
 					<MediaActions
 						mediaViewMode={mediaViewMode}
@@ -217,7 +222,7 @@ export function MediaView() {
 					/>
 				) : (
 					<SelectableSurface
-						ariaLabel="Assets"
+						ariaLabel="Images"
 						orderedIds={orderedMediaIds}
 						revealId={highlightMediaId}
 						onRevealComplete={clearHighlight}
@@ -286,9 +291,7 @@ function MediaAssetDraggable({
 				type: "media",
 				mediaType: item.type,
 				name: item.name,
-				...(item.type !== "audio" && {
-					targetElementTypes: [...MASKABLE_ELEMENT_TYPES],
-				}),
+				targetElementTypes: [...MASKABLE_ELEMENT_TYPES],
 			}}
 			shouldShowPlusOnDrag={false}
 			onAddToTimeline={({ currentTime }) =>
@@ -318,13 +321,13 @@ function MediaItemWithContextMenu({
 	const { isSelected, selectedIds } = useSelection();
 	const idsToDelete = isSelected(item.id) ? selectedIds : [item.id];
 	const deleteLabel =
-		idsToDelete.length > 1 ? `删除 ${idsToDelete.length} 个项目` : "删除";
+		idsToDelete.length > 1 ? `删除 ${idsToDelete.length} 个图片` : "删除";
 
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
 			<ContextMenuContent>
-				<ContextMenuItem>导出素材片段</ContextMenuItem>
+				<ContextMenuItem>导出图片片段</ContextMenuItem>
 				<ContextMenuItem
 					variant="destructive"
 					onClick={(event: React.MouseEvent<HTMLDivElement>) =>
@@ -389,16 +392,6 @@ function formatDuration({ duration }: { duration: number }) {
 	return `${min}:${sec.toString().padStart(2, "0")}`;
 }
 
-function MediaDurationBadge({ duration }: { duration?: number }) {
-	if (!duration) return null;
-
-	return (
-		<div className="absolute right-1 bottom-1 rounded bg-black/70 px-1 text-xs text-white">
-			{formatDuration({ duration })}
-		</div>
-	);
-}
-
 function MediaDurationLabel({ duration }: { duration?: number }) {
 	if (!duration) return null;
 
@@ -441,67 +434,18 @@ function MediaPreview({
 	item: MediaAsset;
 	variant?: "grid" | "compact";
 }) {
-	const shouldShowDurationBadge = variant === "grid";
-
-	if (item.type === "image") {
-		return (
-			<div className="relative flex size-full items-center justify-center bg-muted">
-				<Image
-					src={item.url ?? ""}
-					alt={item.name}
-					fill
-					sizes="100vw"
-					className="object-cover"
-					loading="lazy"
-					unoptimized
-				/>
-			</div>
-		);
-	}
-
-	if (item.type === "video") {
-		if (item.thumbnailUrl) {
-			return (
-				<div className="relative size-full">
-					<Image
-						src={item.thumbnailUrl}
-						alt={item.name}
-						fill
-						sizes="100vw"
-						className="rounded object-cover"
-						loading="lazy"
-						unoptimized
-					/>
-					{shouldShowDurationBadge ? (
-						<MediaDurationBadge duration={item.duration} />
-					) : null}
-				</div>
-			);
-		}
-
-		return (
-			<MediaTypePlaceholder
-				icon={Video01Icon}
-				label="视频"
-				duration={item.duration}
-				variant="muted"
-			/>
-		);
-	}
-
-	if (item.type === "audio") {
-		return (
-			<MediaTypePlaceholder
-				icon={MusicNote03Icon}
-				label="音频"
-				duration={item.duration}
-				variant="bordered"
-			/>
-		);
-	}
-
 	return (
-		<MediaTypePlaceholder icon={Image02Icon} label="未知" variant="muted" />
+		<div className="relative flex size-full items-center justify-center bg-muted">
+			<Image
+				src={item.url ?? ""}
+				alt={item.name}
+				fill
+				sizes="100vw"
+				className="object-cover"
+				loading="lazy"
+				unoptimized
+			/>
+		</div>
 	);
 }
 
@@ -581,13 +525,6 @@ function MediaActions({
 								onSort={onSort}
 							/>
 							<SortMenuItem
-								label="时长"
-								sortKey="duration"
-								currentSortBy={sortBy}
-								currentSortOrder={sortOrder}
-								onSort={onSort}
-							/>
-							<SortMenuItem
 								label="文件大小"
 								sortKey="size"
 								currentSortBy={sortBy}
@@ -598,7 +535,7 @@ function MediaActions({
 					</DropdownMenu>
 					<TooltipContent>
 						<p>
-							按 {sortBy === "name" ? "名称" : sortBy === "type" ? "类型" : sortBy === "duration" ? "时长" : "文件大小"} 排序 ({sortOrder === "asc" ? "升序" : "降序"})
+							按 {sortBy === "name" ? "名称" : sortBy === "type" ? "类型" : "文件大小"} 排序 ({sortOrder === "asc" ? "升序" : "降序"})
 						</p>
 					</TooltipContent>
 				</Tooltip>

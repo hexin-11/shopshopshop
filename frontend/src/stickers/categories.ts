@@ -1,7 +1,5 @@
 export const STICKER_CATEGORIES = {
-	all: "All",
-	// v0.4.0
-	// logos: "Logos",
-	flags: "Flags",
-	shapes: "Shapes",
+	all: "全部",
+	flags: "国旗/地区旗帜",
+	shapes: "几何形状",
 };

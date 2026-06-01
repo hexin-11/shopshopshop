@@ -17,6 +17,13 @@ export interface TCanvasSize {
 	height: number;
 }
 
+export interface TChapterMarker {
+	id: string;
+	title: string;
+	time: number; // in seconds
+	description?: string;
+}
+
 export interface TProjectMetadata {
 	id: string;
 	name: string;
@@ -24,6 +31,7 @@ export interface TProjectMetadata {
 	duration: MediaTime;
 	createdAt: Date;
 	updatedAt: Date;
+	chapters?: TChapterMarker[];
 }
 
 export interface TProjectSettings {

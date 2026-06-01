@@ -1,10 +1,28 @@
 [
   {
+    "id": "asset-73a55996-2a0a-4d7e-bf17-5da7280eee63",
+    "fileName": "2025-07-16 02-03-49.mp4",
+    "type": "商品视频",
+    "category": "default",
+    "tags": [],
+    "uploader": "frontend",
+    "used": 0,
+    "mimeType": "video/mp4",
+    "size": 2050754,
+    "url": "/uploads/asset-73a55996-2a0a-4d7e-bf17-5da7280eee63.mp4",
+    "createdAt": "2026-05-29T13:05:54.956Z",
+    "updatedAt": "2026-05-29T13:05:54.956Z"
+  },
+  {
     "id": "asset-earphone-main",
     "fileName": "耳机主图-白底.png",
     "type": "商品图片",
     "category": "数码配件",
-    "tags": ["耳机", "白底", "主图"],
+    "tags": [
+      "耳机",
+      "白底",
+      "主图"
+    ],
     "uploader": "王艺",
     "used": 12,
     "mimeType": "image/png",
@@ -18,7 +36,10 @@
     "fileName": "佩戴场景-通勤.mp4",
     "type": "商品视频",
     "category": "数码配件",
-    "tags": ["生活方式", "通勤"],
+    "tags": [
+      "生活方式",
+      "通勤"
+    ],
     "uploader": "何鑫",
     "used": 8,
     "mimeType": "video/mp4",
@@ -32,7 +53,10 @@
     "fileName": "精华液质地图.jpg",
     "type": "生活方式图",
     "category": "美妆护肤",
-    "tags": ["美妆", "质感"],
+    "tags": [
+      "美妆",
+      "质感"
+    ],
     "uploader": "李明",
     "used": 6,
     "mimeType": "image/jpeg",
@@ -46,7 +70,10 @@
     "fileName": "跑鞋开箱参考.mp4",
     "type": "参考视频",
     "category": "运动户外",
-    "tags": ["开箱", "运动"],
+    "tags": [
+      "开箱",
+      "运动"
+    ],
     "uploader": "陈琳",
     "used": 4,
     "mimeType": "video/mp4",
@@ -60,7 +87,10 @@
     "fileName": "轻快促销 BGM.wav",
     "type": "音频 / BGM",
     "category": "音频素材",
-    "tags": ["BGM", "促销"],
+    "tags": [
+      "BGM",
+      "促销"
+    ],
     "uploader": "何鑫",
     "used": 18,
     "mimeType": "audio/wav",

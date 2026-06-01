@@ -24,12 +24,13 @@ import { useEditor } from "@/editor/use-editor";
 import { CommandIcon, Logout05Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ShortcutsDialog } from "@/actions/components/shortcuts-dialog";
+import { ViewJsonDialog } from "./view-json-dialog";
 import Image from "next/image";
 import { cn } from "@/utils/ui";
 
 export function EditorHeader() {
 	return (
-		<header className="bg-background flex h-[3.4rem] items-center justify-between px-3 pt-0.5">
+		<header className="bg-background flex h-[3.4rem] items-center justify-between px-3 pt-0.5 border-b">
 			<div className="flex items-center gap-1">
 				<ProjectDropdown />
 				<EditableProjectName />
@@ -45,7 +46,7 @@ export function EditorHeader() {
 
 function ProjectDropdown() {
 	const [openDialog, setOpenDialog] = useState<
-		"delete" | "rename" | "shortcuts" | null
+		"delete" | "rename" | "shortcuts" | "json" | null
 	>(null);
 	const [isExiting, setIsExiting] = useState(false);
 	const router = useRouter();
@@ -79,9 +80,9 @@ function ProjectDropdown() {
 					name: newName.trim(),
 				});
 			} catch (error) {
-				toast.error("Failed to rename project", {
+				toast.error("重命名项目失败", {
 					description:
-						error instanceof Error ? error.message : "Please try again",
+						error instanceof Error ? error.message : "请重试",
 				});
 			} finally {
 				setOpenDialog(null);
@@ -97,9 +98,9 @@ function ProjectDropdown() {
 				});
 				router.push("/projects");
 			} catch (error) {
-				toast.error("Failed to delete project", {
+				toast.error("删除项目失败", {
 					description:
-						error instanceof Error ? error.message : "Please try again",
+						error instanceof Error ? error.message : "请重试",
 				});
 			} finally {
 				setOpenDialog(null);
@@ -127,14 +128,36 @@ function ProjectDropdown() {
 						disabled={isExiting}
 						icon={<HugeiconsIcon icon={Logout05Icon} />}
 					>
-						Exit project
+						退出项目
 					</DropdownMenuItem>
 
 					<DropdownMenuItem
 						onClick={() => setOpenDialog("shortcuts")}
 						icon={<HugeiconsIcon icon={CommandIcon} />}
 					>
-						Shortcuts
+						快捷键
+					</DropdownMenuItem>
+
+					<DropdownMenuItem
+						onClick={() => setOpenDialog("json")}
+						icon={
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								strokeWidth={1.5}
+								stroke="currentColor"
+								className="size-4"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"
+								/>
+							</svg>
+						}
+					>
+						查看 JSON 状态
 					</DropdownMenuItem>
 
 					<DropdownMenuSeparator />
@@ -145,7 +168,7 @@ function ProjectDropdown() {
 							target="_blank"
 							rel="noopener noreferrer"
 						>
-							Discord
+							Discord 社区
 						</Link>
 					</DropdownMenuItem>
 				</DropdownMenuContent>
@@ -165,6 +188,10 @@ function ProjectDropdown() {
 			<ShortcutsDialog
 				isOpen={openDialog === "shortcuts"}
 				onOpenChange={(isOpen) => setOpenDialog(isOpen ? "shortcuts" : null)}
+			/>
+			<ViewJsonDialog
+				isOpen={openDialog === "json"}
+				onOpenChange={(isOpen) => setOpenDialog(isOpen ? "json" : null)}
 			/>
 		</>
 	);
@@ -206,9 +233,9 @@ function EditableProjectName() {
 					name: newName,
 				});
 			} catch (error) {
-				toast.error("Failed to rename project", {
+				toast.error("重命名项目失败", {
 					description:
-						error instanceof Error ? error.message : "Please try again",
+						error instanceof Error ? error.message : "请重试",
 				});
 			}
 		}
@@ -246,3 +273,4 @@ function EditableProjectName() {
 		/>
 	);
 }
+

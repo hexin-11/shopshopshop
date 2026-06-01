@@ -182,7 +182,7 @@ function computeSplitMaskParamUpdate({
 
 export const splitMaskDefinition: MaskDefinition<"split"> = {
 	type: "split",
-	name: "Split",
+	name: "线性分割",
 	features: {
 		hasPosition: true,
 		hasRotation: true,
@@ -238,7 +238,7 @@ export const splitMaskDefinition: MaskDefinition<"split"> = {
 	params: [
 		{
 			key: "centerX",
-			label: "X",
+			label: "位置 X",
 			type: "number",
 			default: 0,
 			min: -100,
@@ -248,7 +248,7 @@ export const splitMaskDefinition: MaskDefinition<"split"> = {
 		},
 		{
 			key: "centerY",
-			label: "Y",
+			label: "位置 Y",
 			type: "number",
 			default: 0,
 			min: -100,
@@ -258,7 +258,7 @@ export const splitMaskDefinition: MaskDefinition<"split"> = {
 		},
 		{
 			key: "rotation",
-			label: "Rotation",
+			label: "旋转",
 			type: "number",
 			default: 0,
 			min: 0,

@@ -144,7 +144,7 @@ button, input, select, textarea { font: inherit; }
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg
            bg-[#4684EE] px-[22px] py-[14px] text-[15px] font-medium text-white
-           transition-colors duration-300
+           whitespace-nowrap shrink-0 transition-colors duration-300
            hover:bg-[#346ED5];
   }
 
@@ -152,7 +152,7 @@ button, input, select, textarea { font: inherit; }
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg
            border border-[#E5E7EB] bg-white px-[22px] py-[14px] text-[15px] font-medium text-[#171719]
-           transition-colors duration-300
+           whitespace-nowrap shrink-0 transition-colors duration-300
            hover:bg-neutral-50;
   }
 
@@ -160,7 +160,7 @@ button, input, select, textarea { font: inherit; }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-lg
            px-4 py-2 text-[15px] font-medium text-[#171719]/60
-           transition-colors duration-300
+           whitespace-nowrap shrink-0 transition-colors duration-300
            hover:text-[#171719] hover:bg-neutral-100;
   }
 
@@ -177,7 +177,7 @@ button, input, select, textarea { font: inherit; }
 
   /* 状态标记 */
   .badge {
-    @apply inline-flex items-center gap-1.5 rounded-md bg-[#F0F5FF] px-2.5 py-1 text-xs font-medium text-[#4684EE];
+    @apply inline-flex items-center gap-1.5 rounded-md bg-[#F0F5FF] px-2.5 py-1 text-xs font-medium text-[#4684EE] whitespace-nowrap shrink-0;
   }
 }
 

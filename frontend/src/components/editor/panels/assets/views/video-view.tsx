@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState } from "react";
 import { PanelView } from "@/components/editor/panels/assets/views/base-panel";
 import { MediaDragOverlay } from "@/components/editor/panels/assets/drag-overlay";
@@ -53,13 +52,12 @@ import {
 	GridViewIcon,
 	LeftToRightListDashIcon,
 	SortingOneNineIcon,
-	Image02Icon,
-	MusicNote03Icon,
 	Video01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import Image from "next/image";
 
-export function MediaView() {
+export function VideoView() {
 	const editor = useEditor();
 	const mediaFiles = useEditor((e) => e.media.getAssets());
 	const activeProject = useEditor((e) => e.project.getActive());
@@ -95,15 +93,20 @@ export function MediaView() {
 						onProgress: (progress: { progress: number }) =>
 							setProgress(progress.progress),
 					});
-					for (const asset of processedAssets) {
+					const videoAssets = processedAssets.filter(asset => asset.type === "video");
+					if (videoAssets.length === 0) {
+						toast.warning("没有有效的视频文件");
+						return { uploadedCount: 0, assetNames: [] };
+					}
+					for (const asset of videoAssets) {
 						await editor.media.addMediaAsset({
 							projectId: activeProject.metadata.id,
 							asset,
 						});
 					}
 					return {
-						uploadedCount: processedAssets.length,
-						assetNames: processedAssets.map((asset) => asset.name),
+						uploadedCount: videoAssets.length,
+						assetNames: videoAssets.map((asset) => asset.name),
 					};
 				},
 			});
@@ -117,7 +120,7 @@ export function MediaView() {
 
 	const { isDragOver, dragProps, openFilePicker, fileInputProps } =
 		useFileUpload({
-			accept: "image/*,video/*,audio/*",
+			accept: "video/*",
 			multiple: true,
 			onFilesSelected: (files) => processFiles({ files }),
 		});
@@ -149,7 +152,8 @@ export function MediaView() {
 	};
 
 	const filteredMediaItems = useMemo(() => {
-		const filtered = mediaFiles.filter((item) => !item.ephemeral);
+		// Filter strictly to videos
+		const filtered = mediaFiles.filter((item) => !item.ephemeral && item.type === "video");
 
 		filtered.sort((a, b) => {
 			let valueA: string | number;
@@ -183,6 +187,7 @@ export function MediaView() {
 
 		return filtered;
 	}, [mediaFiles, mediaSortBy, mediaSortOrder]);
+
 	const orderedMediaIds = useMemo(() => {
 		return filteredMediaItems.map((item) => item.id);
 	}, [filteredMediaItems]);
@@ -192,7 +197,7 @@ export function MediaView() {
 			<input {...fileInputProps} />
 
 			<PanelView
-				title="素材库"
+				title="视频库"
 				actions={
 					<MediaActions
 						mediaViewMode={mediaViewMode}
@@ -217,7 +222,7 @@ export function MediaView() {
 					/>
 				) : (
 					<SelectableSurface
-						ariaLabel="Assets"
+						ariaLabel="Videos"
 						orderedIds={orderedMediaIds}
 						revealId={highlightMediaId}
 						onRevealComplete={clearHighlight}
@@ -286,9 +291,7 @@ function MediaAssetDraggable({
 				type: "media",
 				mediaType: item.type,
 				name: item.name,
-				...(item.type !== "audio" && {
-					targetElementTypes: [...MASKABLE_ELEMENT_TYPES],
-				}),
+				targetElementTypes: [...MASKABLE_ELEMENT_TYPES],
 			}}
 			shouldShowPlusOnDrag={false}
 			onAddToTimeline={({ currentTime }) =>
@@ -318,13 +321,13 @@ function MediaItemWithContextMenu({
 	const { isSelected, selectedIds } = useSelection();
 	const idsToDelete = isSelected(item.id) ? selectedIds : [item.id];
 	const deleteLabel =
-		idsToDelete.length > 1 ? `删除 ${idsToDelete.length} 个项目` : "删除";
+		idsToDelete.length > 1 ? `删除 ${idsToDelete.length} 个视频` : "删除";
 
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
 			<ContextMenuContent>
-				<ContextMenuItem>导出素材片段</ContextMenuItem>
+				<ContextMenuItem>导出视频片段</ContextMenuItem>
 				<ContextMenuItem
 					variant="destructive"
 					onClick={(event: React.MouseEvent<HTMLDivElement>) =>
@@ -443,65 +446,32 @@ function MediaPreview({
 }) {
 	const shouldShowDurationBadge = variant === "grid";
 
-	if (item.type === "image") {
+	if (item.thumbnailUrl) {
 		return (
-			<div className="relative flex size-full items-center justify-center bg-muted">
+			<div className="relative size-full">
 				<Image
-					src={item.url ?? ""}
+					src={item.thumbnailUrl}
 					alt={item.name}
 					fill
 					sizes="100vw"
-					className="object-cover"
+					className="rounded object-cover"
 					loading="lazy"
 					unoptimized
 				/>
+				{shouldShowDurationBadge ? (
+					<MediaDurationBadge duration={item.duration} />
+				) : null}
 			</div>
 		);
 	}
 
-	if (item.type === "video") {
-		if (item.thumbnailUrl) {
-			return (
-				<div className="relative size-full">
-					<Image
-						src={item.thumbnailUrl}
-						alt={item.name}
-						fill
-						sizes="100vw"
-						className="rounded object-cover"
-						loading="lazy"
-						unoptimized
-					/>
-					{shouldShowDurationBadge ? (
-						<MediaDurationBadge duration={item.duration} />
-					) : null}
-				</div>
-			);
-		}
-
-		return (
-			<MediaTypePlaceholder
-				icon={Video01Icon}
-				label="视频"
-				duration={item.duration}
-				variant="muted"
-			/>
-		);
-	}
-
-	if (item.type === "audio") {
-		return (
-			<MediaTypePlaceholder
-				icon={MusicNote03Icon}
-				label="音频"
-				duration={item.duration}
-				variant="bordered"
-			/>
-		);
-	}
-
 	return (
-		<MediaTypePlaceholder icon={Image02Icon} label="未知" variant="muted" />
+		<MediaTypePlaceholder
+			icon={Video01Icon}
+			label="视频"
+			duration={item.duration}
+			variant="muted"
+		/>
 	);
 }
 
