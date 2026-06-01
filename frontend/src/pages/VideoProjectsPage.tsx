@@ -9,10 +9,20 @@ import {
   Share2,
   Users,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { jobs, projects } from "../data/mockData";
+import { api } from "../lib/api";
 
 export default function VideoProjectsPage({ openProject }: { openProject: (id: string) => void }) {
-  const activeJobs = jobs.filter((j) => j.type === "generating");
+  const [projectList, setProjectList] = useState<any[]>([...projects]);
+  const [jobList, setJobList] = useState<any[]>([...jobs]);
+
+  useEffect(() => {
+    api.projects().then((items) => setProjectList(items as any[]));
+    api.jobs().then((items) => setJobList(items as any[]));
+  }, []);
+
+  const activeJobs = jobList.filter((j) => j.type === "generating");
 
   return (
     <div className="flex flex-col gap-10 animate-fade-in max-w-6xl mx-auto">
@@ -94,7 +104,7 @@ export default function VideoProjectsPage({ openProject }: { openProject: (id: s
       <section>
         <h2 className="mb-6 h2-siter text-[24px] sm:text-[28px]">所有项目</h2>
         <div className="grid gap-6 xl:grid-cols-2">
-          {projects.map((project) => (
+          {projectList.map((project) => (
             <button
               key={project.id}
               onClick={() => openProject(project.id)}

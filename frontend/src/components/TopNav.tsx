@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Bell, Settings, LogOut, ChevronDown } from "lucide-react";
 import type { RouteKey } from "../data/mockData";
 import { navItems } from "../lib/routes";
-import { user } from "../data/mockData";
+import { user as fallbackUser } from "../data/mockData";
+import { api } from "../lib/api";
 import { cn } from "../lib/utils";
 
 interface TopNavProps {
@@ -13,6 +14,7 @@ interface TopNavProps {
 export default function TopNav({ current, navigate }: TopNavProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [user, setUser] = useState(fallbackUser);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,6 +23,12 @@ export default function TopNav({ current, navigate }: TopNavProps) {
     }
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    api.currentUser().then((nextUser) => {
+      if (nextUser) setUser(nextUser);
+    });
   }, []);
 
   useEffect(() => {

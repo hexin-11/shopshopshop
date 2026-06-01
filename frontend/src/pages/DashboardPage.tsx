@@ -7,20 +7,40 @@ import {
   FileVideo,
   Zap,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { dashboardMetrics, jobs, platformPerformance, catalog } from "../data/mockData";
+import { api } from "../lib/api";
 
 export default function DashboardPage({
   navigate,
 }: {
   navigate: (r: "projects" | "products") => void;
 }) {
-  const activeJobs = jobs.filter((j) => j.type === "generating");
+  const [dashboard, setDashboard] = useState({
+    metrics: [...dashboardMetrics] as any[],
+    activeJobs: jobs.filter((j) => j.type === "generating") as any[],
+    recentProducts: [...catalog.slice(0, 5)] as any[],
+    platformPerformance: [...platformPerformance] as any[],
+  });
+
+  useEffect(() => {
+    api.dashboard().then((next) =>
+      setDashboard({
+        metrics: [...(next.metrics || [])],
+        activeJobs: [...(next.activeJobs || [])],
+        recentProducts: [...(next.recentProducts || [])],
+        platformPerformance: [...(next.platformPerformance || [])],
+      })
+    );
+  }, []);
+
+  const activeJobs = dashboard.activeJobs;
 
   return (
     <div className="flex flex-col gap-10 animate-fade-in mx-auto w-full">
       {/* ── 核心指标 ───────────────────────────── */}
       <div className="grid grid-cols-2 gap-6 xl:grid-cols-4 text-left">
-        {dashboardMetrics.map((m, i) => {
+        {dashboard.metrics.map((m, i) => {
           return (
             <button
               key={m.label}
@@ -124,7 +144,7 @@ export default function DashboardPage({
           </div>
           
           <div className="space-y-3 flex-1">
-            {catalog.slice(0, 5).map((prod) => (
+            {dashboard.recentProducts.map((prod) => (
               <button
                 key={prod.id}
                 onClick={() => navigate("products")}
@@ -162,7 +182,7 @@ export default function DashboardPage({
         </div>
         
         <div className="grid gap-6 lg:grid-cols-3">
-          {platformPerformance.map((platform, pi) => (
+          {dashboard.platformPerformance.map((platform, pi) => (
             <div
               key={platform.platform}
               style={{ animationDelay: `${360 + pi * 60}ms` }}

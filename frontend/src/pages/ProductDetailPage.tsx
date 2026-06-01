@@ -15,9 +15,10 @@ import {
   Users,
   CheckCircle2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { assets, catalog, productScripts, projects, dashboardMetrics } from "../data/mockData";
+import { assets, catalog, productScripts, dashboardMetrics } from "../data/mockData";
+import { api } from "../lib/api";
 import { CreateProjectWizard } from "../components/project/CreateProjectWizard";
 
 type Tab = "overview" | "assets" | "scripts";
@@ -47,9 +48,20 @@ export default function ProductDetailPage({
   const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [product, setProduct] = useState<any>(catalog.find((p) => p.id === productId) ?? catalog[0]);
+  const [assetList, setAssetList] = useState<any[]>(assets);
+  const [scripts, setScripts] = useState<any[]>(productScripts[productId] ?? []);
 
-  const product = catalog.find((p) => p.id === productId) ?? catalog[0];
-  const scripts = productScripts[productId] ?? [];
+  useEffect(() => {
+    setProduct(catalog.find((p) => p.id === productId) ?? catalog[0]);
+    setAssetList(assets);
+    setScripts(productScripts[productId] ?? []);
+
+    api.product(productId).then(setProduct);
+    api.productAssets(productId).then((items) => setAssetList(items as any[]));
+    api.productScripts(productId).then((items) => setScripts(items as any[]));
+  }, [productId]);
+
   const activeScript = scripts.find((s) => s.id === selectedScriptId);
 
   const toggleAsset = (assetName: string) => {
@@ -217,7 +229,7 @@ export default function ProductDetailPage({
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {assets.map((asset, i) => (
+                    {assetList.map((asset, i) => (
                       <motion.button
                         key={asset.name}
                         onClick={() => toggleAsset(asset.name)}
@@ -378,7 +390,13 @@ export default function ProductDetailPage({
           </div>
         </div>
       </div>
-      <CreateProjectWizard open={isWizardOpen} onOpenChange={setIsWizardOpen} />
+      <CreateProjectWizard
+        open={isWizardOpen}
+        onOpenChange={setIsWizardOpen}
+        product={product}
+        scripts={scripts}
+        onCreated={(project) => openProject(project.id)}
+      />
     </div>
   );
 }
