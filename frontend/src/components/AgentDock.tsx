@@ -6,17 +6,21 @@ import {
   FileText,
   Grid2X2,
   Image,
-  Library,
   Mic,
   MicOff,
+  MoreHorizontal,
   Paperclip,
+  Pencil,
+  Pin,
+  PinOff,
   Plus,
   Search,
   Send,
   Settings,
   SlidersHorizontal,
-  Wrench,
+  Trash2,
   Wand2,
+  Wrench,
 } from "lucide-react";
 
 interface AgentDockProps {
@@ -33,6 +37,7 @@ type Conversation = {
   id: number;
   title: string;
   updatedAt: string;
+  pinned?: boolean;
   messages: ChatMessage[];
   references: string[];
 };
@@ -160,11 +165,21 @@ export default function AgentDock({ children }: AgentDockProps) {
   const [attachments, setAttachments] = useState<string[]>([]);
   const [listening, setListening] = useState(false);
   const [model, setModel] = useState("Pro");
+  const [conversationMenuId, setConversationMenuId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeConversation = useMemo(
     () => conversations.find((item) => item.id === activeConversationId) ?? conversations[0],
     [activeConversationId, conversations],
+  );
+
+  const sortedConversations = useMemo(
+    () =>
+      [...conversations].sort((a, b) => {
+        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+        return b.id - a.id;
+      }),
+    [conversations],
   );
 
   useEffect(() => {
@@ -215,13 +230,58 @@ export default function AgentDock({ children }: AgentDockProps) {
     setInput("");
     setAttachments([]);
     setListening(false);
+    setConversationMenuId(null);
     setView("chat");
   };
 
   const selectConversation = (id: number) => {
     setActiveConversationId(id);
     setInput("");
+    setConversationMenuId(null);
     setView("chat");
+  };
+
+  const togglePinConversation = (id: number) => {
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === id
+          ? { ...conversation, pinned: !conversation.pinned, updatedAt: "刚刚" }
+          : conversation,
+      ),
+    );
+    setConversationMenuId(null);
+  };
+
+  const renameConversation = (id: number) => {
+    const current = conversations.find((conversation) => conversation.id === id);
+    const nextTitle = window.prompt("重命名会话", current?.title ?? "新会话");
+    if (!nextTitle?.trim()) return;
+
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === id
+          ? { ...conversation, title: nextTitle.trim(), updatedAt: "刚刚" }
+          : conversation,
+      ),
+    );
+    setConversationMenuId(null);
+  };
+
+  const deleteConversation = (id: number) => {
+    setConversations((prev) => {
+      const remaining = prev.filter((conversation) => conversation.id !== id);
+      if (remaining.length === 0) {
+        const next = createConversation();
+        setActiveConversationId(next.id);
+        return [next];
+      }
+
+      if (activeConversationId === id) {
+        setActiveConversationId(remaining[0].id);
+      }
+      return remaining;
+    });
+    setConversationMenuId(null);
   };
 
   const addExchange = (text: string, reply: string) => {
@@ -326,24 +386,52 @@ export default function AgentDock({ children }: AgentDockProps) {
             </button>
           </div>
           <div className="agent-history-list">
-            {conversations.map((conversation) => (
-              <button
+            {sortedConversations.map((conversation) => (
+              <div
                 key={conversation.id}
-                type="button"
-                className={conversation.id === activeConversationId ? "is-active" : ""}
-                onClick={() => selectConversation(conversation.id)}
+                className={`agent-history-item ${conversation.id === activeConversationId ? "is-active" : ""}`}
               >
-                <span>{conversation.title}</span>
-                <small>{conversation.messages[conversation.messages.length - 1]?.text ?? "暂无消息"}</small>
-              </button>
+                <button
+                  type="button"
+                  className="agent-history-select"
+                  onClick={() => selectConversation(conversation.id)}
+                >
+                  <span>{conversation.pinned ? `★ ${conversation.title}` : conversation.title}</span>
+                  <small>{conversation.messages[conversation.messages.length - 1]?.text ?? "暂无消息"}</small>
+                </button>
+                <button
+                  type="button"
+                  className="agent-history-menu-button"
+                  aria-label="会话菜单"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setConversationMenuId((current) =>
+                      current === conversation.id ? null : conversation.id,
+                    );
+                  }}
+                >
+                  <MoreHorizontal size={17} />
+                </button>
+                {conversationMenuId === conversation.id && (
+                  <div className="agent-history-menu">
+                    <button type="button" onClick={() => togglePinConversation(conversation.id)}>
+                      {conversation.pinned ? <PinOff size={15} /> : <Pin size={15} />}
+                      {conversation.pinned ? "取消置顶" : "置顶"}
+                    </button>
+                    <button type="button" onClick={() => renameConversation(conversation.id)}>
+                      <Pencil size={15} />
+                      重命名
+                    </button>
+                    <button type="button" onClick={() => deleteConversation(conversation.id)}>
+                      <Trash2 size={15} />
+                      删除
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </aside>
-
-        <button type="button" className="agent-asset-button" onClick={() => setView("library")}>
-          <Library size={17} />
-          资料库
-        </button>
 
         <button type="button" className="agent-top-back" onClick={returnToPreviousPage}>
           <ArrowLeft size={18} />
