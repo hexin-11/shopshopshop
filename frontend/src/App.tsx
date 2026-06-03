@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import AgentDock from "./components/AgentDock";
 import AppLayout from "./components/AppLayout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -79,14 +80,18 @@ export default function App() {
   }, [route, selectedProductId]);
 
   // 全屏页面（不用 AppLayout）
-  if (route === "login" || route === "register" || route === "projectWorkspace") return page;
+  if (route === "login" || route === "register" || route === "projectWorkspace") {
+    return <AgentDock>{page}</AgentDock>;
+  }
 
   // 普通应用页面
   const navCurrent: RouteKey = route === "productDetail" ? "products" : (route as RouteKey);
 
   return (
-    <AppLayout current={navCurrent} navigate={(r) => navigate(r)}>
-      {page}
-    </AppLayout>
+    <AgentDock>
+      <AppLayout current={navCurrent} navigate={(r) => navigate(r)}>
+        {page}
+      </AppLayout>
+    </AgentDock>
   );
 }
