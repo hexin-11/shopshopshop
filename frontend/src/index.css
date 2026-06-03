@@ -335,6 +335,7 @@ button, input, select, textarea { font: inherit; }
 .agent-history-sidebar {
   position: absolute;
   inset: 0 auto 0 0;
+  z-index: 3;
   width: 244px;
   border-right: 1px solid rgba(226, 232, 240, 0.78);
   padding: 14px 12px;
@@ -419,13 +420,14 @@ button, input, select, textarea { font: inherit; }
   position: absolute;
   top: 14px;
   right: 74px;
-  z-index: 1;
+  z-index: 4;
 }
 
 .agent-top-back {
   position: absolute;
   top: 14px;
   right: 14px;
+  z-index: 4;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -448,6 +450,7 @@ button, input, select, textarea { font: inherit; }
 
 .agent-home {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -501,8 +504,8 @@ button, input, select, textarea { font: inherit; }
 
 .agent-live-panel {
   width: min(920px, calc(100vw - 332px));
-  min-height: 190px;
-  max-height: 34vh;
+  min-height: 300px;
+  max-height: 46vh;
   margin-bottom: 22px;
   overflow: auto;
   border: 1px solid rgba(216, 226, 236, 0.74);
@@ -511,6 +514,104 @@ button, input, select, textarea { font: inherit; }
   background: rgba(255, 255, 255, 0.58);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 22px 70px rgba(83, 132, 181, 0.12);
   backdrop-filter: blur(18px);
+}
+
+.agent-drawing-workspace {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(240px, 1fr);
+  gap: 14px;
+}
+
+.agent-canvas-preview {
+  display: grid;
+  min-height: 260px;
+  overflow: hidden;
+  border: 1px solid rgba(125, 211, 252, 0.45);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(236, 254, 255, 0.76)),
+    #fff;
+}
+
+.agent-generated-art {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  min-height: 260px;
+  padding: 24px;
+  color: #083344;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(255, 255, 255, 0.9) 0 8%, rgba(14, 165, 233, 0.22) 16%, transparent 34%),
+    linear-gradient(155deg, rgba(20, 184, 166, 0.2), rgba(59, 130, 246, 0.26) 46%, rgba(244, 114, 182, 0.18)),
+    #f8fafc;
+}
+
+.agent-generated-art strong {
+  font-size: 21px;
+  font-weight: 950;
+}
+
+.agent-generated-art span {
+  max-width: 280px;
+  color: rgba(8, 51, 68, 0.68);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.agent-session-meta {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid rgba(216, 226, 236, 0.78);
+  border-radius: 22px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.agent-session-meta strong {
+  color: #171719;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.agent-session-meta > span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #0f766e;
+  background: rgba(20, 184, 166, 0.13);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.agent-session-meta p {
+  margin: 0;
+  color: rgba(23, 23, 25, 0.62);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.agent-reference-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.agent-reference-list small {
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: rgba(23, 23, 25, 0.68);
+  background: rgba(241, 245, 249, 0.95);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agent-result-history {
+  grid-column: 1 / -1;
 }
 
 .agent-thread {
@@ -807,10 +908,18 @@ button, input, select, textarea { font: inherit; }
 
   .agent-live-panel {
     width: calc(100vw - 34px);
-    min-height: 220px;
-    max-height: 42vh;
+    min-height: 300px;
+    max-height: 48vh;
     border-radius: 22px;
     padding: 12px;
+  }
+
+  .agent-drawing-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-result-history {
+    grid-column: auto;
   }
 
   .agent-action-grid {

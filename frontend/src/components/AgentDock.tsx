@@ -23,7 +23,7 @@ interface AgentDockProps {
   children: ReactNode;
 }
 
-type AgentView = "chat" | "search" | "apps";
+type AgentView = "chat" | "library" | "actions";
 type ChatMessage = {
   id: number;
   role: "user" | "agent";
@@ -32,26 +32,58 @@ type ChatMessage = {
 type Conversation = {
   id: number;
   title: string;
+  updatedAt: string;
   messages: ChatMessage[];
+  references: string[];
+};
+type LibraryItem = {
+  id: string;
+  type: string;
+  title: string;
+  detail: string;
 };
 
-const searchSeed = [
-  { type: "商品", title: "无线耳机带货项目", detail: "已匹配 12 条素材、3 个脚本、2 个可生成视频方案", path: "/products/prod-earphone" },
-  { type: "脚本", title: "开场三秒强钩子模板", detail: "适合数码、美妆、家居类商品，可直接进入视频生成", path: "/projects/p-earphone" },
-  { type: "项目", title: "618 爆品短视频队列", detail: "4 个项目待审核，1 个项目正在渲染", path: "/projects" },
+const agentHistoryFlag = "shopclip-agent";
+const STORAGE_KEY = "shopclip-agent-conversations";
+
+const libraryItems: LibraryItem[] = [
+  {
+    id: "earphone",
+    type: "商品",
+    title: "Havit H630BT 主动降噪耳机",
+    detail: "含主图、卖点、短视频脚本和 2 个项目。",
+  },
+  {
+    id: "script-hook",
+    type: "脚本",
+    title: "开场三秒强钩子模板",
+    detail: "适合数码、美妆、家居类商品，可直接生成分镜。",
+  },
+  {
+    id: "project-618",
+    type: "项目",
+    title: "618 爆品短视频队列",
+    detail: "包含待审核项目、生成中任务和历史导出记录。",
+  },
+  {
+    id: "cover",
+    type: "素材",
+    title: "竖版封面标题模板",
+    detail: "适合 9:16 带货视频封面，留有商品与标题空间。",
+  },
 ];
 
 const quickActions = [
   {
     label: "商品卖点",
     prompt: "帮我把当前商品整理成 5 个带货卖点",
-    reply: "已整理卖点框架：痛点开场、核心参数、使用场景、对比优势、下单理由。下一步可以直接生成短视频脚本。",
+    reply: "已整理卖点框架：痛点开场、核心参数、使用场景、对比优势、下单理由。你可以继续让我生成短视频脚本。",
     icon: FileText,
   },
   {
     label: "素材检查",
     prompt: "检查当前素材是否适合生成短视频",
-    reply: "素材检查完成：主图清晰度可用，建议补 2 张使用场景图，并把卖点字幕控制在 12 字以内。",
+    reply: "素材检查完成：主图清晰度可用，建议补 2 张使用场景图，并把字幕卖点控制在 12 字以内。",
     icon: Image,
   },
   {
@@ -63,28 +95,72 @@ const quickActions = [
 ];
 
 const modelOptions = ["Fast", "Pro", "Deep"];
-const agentHistoryFlag = "shopclip-agent";
+
 const firstConversation: Conversation = {
   id: 1,
   title: "ShopClip 创作助手",
+  updatedAt: "今天",
+  references: [],
   messages: [
-    { id: 1, role: "agent", text: "我可以帮你找商品、改脚本、检查素材，或者把项目推进到生成队列。" },
+    {
+      id: 1,
+      role: "agent",
+      text: "我可以帮你找商品、改脚本、检查素材，或者把项目推进到生成队列。",
+    },
   ],
 };
 
+const createConversation = (): Conversation => {
+  const id = Date.now();
+  return {
+    id,
+    title: "新会话",
+    updatedAt: "刚刚",
+    references: [],
+    messages: [
+      {
+        id: id + 1,
+        role: "agent",
+        text: "新会话已创建。你可以输入想法、脚本需求，或者从资料库添加参考内容。",
+      },
+    ],
+  };
+};
+
+const loadConversations = () => {
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (!saved) return [firstConversation];
+    const parsed = JSON.parse(saved) as Conversation[];
+    return parsed.length ? parsed : [firstConversation];
+  } catch {
+    return [firstConversation];
+  }
+};
+
+const makeConversationTitle = (text: string) => {
+  const clean = text.trim().replace(/\s+/g, " ");
+  if (!clean) return "新会话";
+  return clean.length > 16 ? `${clean.slice(0, 16)}...` : clean;
+};
+
+const getAgentReturnTarget = () => `${window.location.pathname}${window.location.search}`;
+
 export default function AgentDock({ children }: AgentDockProps) {
+  const initialConversationsRef = useRef<Conversation[] | null>(null);
+  if (!initialConversationsRef.current) {
+    initialConversationsRef.current = loadConversations();
+  }
+
   const [open, setOpen] = useState(() => window.location.hash === "#agent");
-  const [input, setInput] = useState("");
   const [view, setView] = useState<AgentView>("chat");
-  const [conversations, setConversations] = useState<Conversation[]>([firstConversation]);
-  const [activeConversationId, setActiveConversationId] = useState(firstConversation.id);
+  const [input, setInput] = useState("");
+  const [conversations, setConversations] = useState<Conversation[]>(initialConversationsRef.current);
+  const [activeConversationId, setActiveConversationId] = useState(initialConversationsRef.current[0]?.id ?? firstConversation.id);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [listening, setListening] = useState(false);
   const [model, setModel] = useState("Pro");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [completedActions, setCompletedActions] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const openedFromAgentHistoryRef = useRef(false);
 
   const activeConversation = useMemo(
     () => conversations.find((item) => item.id === activeConversationId) ?? conversations[0],
@@ -92,19 +168,20 @@ export default function AgentDock({ children }: AgentDockProps) {
   );
 
   useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  }, [conversations]);
+
+  useEffect(() => {
+    if (window.location.hash === "#agent" && !window.history.state?.[agentHistoryFlag]) {
+      window.history.replaceState(
+        { ...(window.history.state ?? {}), [agentHistoryFlag]: true, returnTo: getAgentReturnTarget() },
+        "",
+        window.location.href,
+      );
+    }
+
     const onPopState = () => {
-      if (window.location.hash === "#agent") {
-        setOpen(true);
-        return;
-      }
-
-      if (openedFromAgentHistoryRef.current && !window.history.state?.[agentHistoryFlag]) {
-        openedFromAgentHistoryRef.current = false;
-        setOpen(false);
-        return;
-      }
-
-      setOpen(false);
+      setOpen(window.location.hash === "#agent");
     };
 
     window.addEventListener("popstate", onPopState);
@@ -113,28 +190,38 @@ export default function AgentDock({ children }: AgentDockProps) {
 
   const openAgent = (nextView: AgentView = "chat") => {
     setView(nextView);
-    if (!open && !window.history.state?.[agentHistoryFlag]) {
-      const currentUrl = `${window.location.pathname}${window.location.search}#agent`;
-      window.history.pushState({ ...(window.history.state ?? {}), [agentHistoryFlag]: true }, "", currentUrl);
-      openedFromAgentHistoryRef.current = true;
+    if (!open && window.location.hash !== "#agent") {
+      const returnTo = getAgentReturnTarget();
+      window.history.pushState(
+        { ...(window.history.state ?? {}), [agentHistoryFlag]: true, returnTo },
+        "",
+        `${returnTo}#agent`,
+      );
     }
     setOpen(true);
   };
 
   const returnToPreviousPage = () => {
-    if (openedFromAgentHistoryRef.current && window.history.state?.[agentHistoryFlag]) {
-      window.history.back();
-      return;
-    }
-
+    const target = window.history.state?.returnTo ?? getAgentReturnTarget();
+    window.history.replaceState({}, "", target);
+    window.dispatchEvent(new PopStateEvent("popstate"));
     setOpen(false);
   };
 
-  const navigateTo = (path: string) => {
-    openedFromAgentHistoryRef.current = false;
-    window.history.pushState({}, "", path);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-    setOpen(false);
+  const startNewConversation = () => {
+    const next = createConversation();
+    setConversations((prev) => [next, ...prev]);
+    setActiveConversationId(next.id);
+    setInput("");
+    setAttachments([]);
+    setListening(false);
+    setView("chat");
+  };
+
+  const selectConversation = (id: number) => {
+    setActiveConversationId(id);
+    setInput("");
+    setView("chat");
   };
 
   const addExchange = (text: string, reply: string) => {
@@ -142,10 +229,11 @@ export default function AgentDock({ children }: AgentDockProps) {
     setConversations((prev) =>
       prev.map((conversation) => {
         if (conversation.id !== activeConversationId) return conversation;
-        const shouldRename = conversation.title === firstConversation.title || conversation.title === "新对话";
+        const shouldRename = conversation.title === firstConversation.title || conversation.title === "新会话";
         return {
           ...conversation,
-          title: shouldRename ? text.slice(0, 18) || "新对话" : conversation.title,
+          title: shouldRename ? makeConversationTitle(text) : conversation.title,
+          updatedAt: "刚刚",
           messages: [
             ...conversation.messages,
             { id: base, role: "user", text },
@@ -156,37 +244,38 @@ export default function AgentDock({ children }: AgentDockProps) {
     );
   };
 
-  const createConversation = () => {
-    const id = Date.now();
-    setConversations((prev) => [
-      {
-        id,
-        title: "新对话",
-        messages: [{ id: id + 1, role: "agent", text: "新对话已创建。输入想法、脚本或上传参考素材，我会接着处理。" }],
-      },
-      ...prev,
-    ]);
-    setActiveConversationId(id);
+  const addLibraryItem = (item: LibraryItem) => {
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === activeConversationId
+          ? {
+              ...conversation,
+              updatedAt: "刚刚",
+              references: Array.from(new Set([...conversation.references, item.title])),
+              messages: [
+                ...conversation.messages,
+                {
+                  id: Date.now(),
+                  role: "agent",
+                  text: `已把「${item.title}」加入当前会话参考。${item.detail}`,
+                },
+              ],
+            }
+          : conversation,
+      ),
+    );
+    setInput((current) => (current.trim() ? `${current.trim()}，参考${item.title}` : `参考${item.title}，`));
     setView("chat");
-    setInput("");
-    setAttachments([]);
   };
 
   const submitInput = () => {
     const text = input.trim();
     if (!text && attachments.length === 0) return;
 
-    if (view === "search") {
-      setSearchTerm(text || attachments.join("、"));
-      setInput("");
-      setAttachments([]);
-      return;
-    }
-
-    const attachmentText = attachments.length > 0 ? `，附带 ${attachments.length} 个文件` : "";
+    const attachmentText = attachments.length > 0 ? `，并附带 ${attachments.length} 个文件` : "";
     addExchange(
       text || `分析这些附件${attachmentText}`,
-      `${model} 模式已收到${attachmentText}。我会按商品、素材、脚本、项目进度四类拆解，并把下一步动作整理在这里。`,
+      `${model} 模式已收到${attachmentText}。我会按商品、素材、脚本、项目进度四类拆解，并把下一步动作整理在当前会话里。`,
     );
     setInput("");
     setAttachments([]);
@@ -200,31 +289,13 @@ export default function AgentDock({ children }: AgentDockProps) {
   };
 
   const runAction = (action: (typeof quickActions)[number]) => {
-    setCompletedActions((prev) => (prev.includes(action.label) ? prev : [...prev, action.label]));
     addExchange(action.prompt, action.reply);
     setView("chat");
   };
 
   const rotateModel = () => {
-    setModel((current) => {
-      const next = modelOptions[(modelOptions.indexOf(current) + 1) % modelOptions.length];
-      addExchange("切换 Agent 模式", `已切换到 ${next} 模式。`);
-      return next;
-    });
-    setView("chat");
+    setModel((current) => modelOptions[(modelOptions.indexOf(current) + 1) % modelOptions.length]);
   };
-
-  const activeTitle = {
-    chat: "你好，想创作什么？",
-    search: "搜索工作台内容",
-    apps: "选择一个可执行动作",
-  }[view];
-
-  const filteredResults = useMemo(() => {
-    if (!searchTerm.trim()) return searchSeed;
-    const term = searchTerm.trim().toLowerCase();
-    return searchSeed.filter((item) => `${item.type}${item.title}${item.detail}`.toLowerCase().includes(term));
-  }, [searchTerm]);
 
   return (
     <div className={`agent-shell ${open ? "agent-shell-open" : ""}`}>
@@ -247,11 +318,11 @@ export default function AgentDock({ children }: AgentDockProps) {
       )}
 
       <main className="agent-full-page" aria-hidden={!open}>
-        <aside className="agent-history-sidebar" aria-label="Agent chat history">
+        <aside className="agent-history-sidebar" aria-label="Agent 会话历史">
           <div className="agent-history-top">
-            <button type="button" className="agent-new-chat" onClick={createConversation}>
+            <button type="button" className="agent-new-chat" onClick={startNewConversation}>
               <Plus size={17} />
-              新对话
+              新会话
             </button>
           </div>
           <div className="agent-history-list">
@@ -260,10 +331,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                 key={conversation.id}
                 type="button"
                 className={conversation.id === activeConversationId ? "is-active" : ""}
-                onClick={() => {
-                  setActiveConversationId(conversation.id);
-                  setView("chat");
-                }}
+                onClick={() => selectConversation(conversation.id)}
               >
                 <span>{conversation.title}</span>
                 <small>{conversation.messages[conversation.messages.length - 1]?.text ?? "暂无消息"}</small>
@@ -272,9 +340,9 @@ export default function AgentDock({ children }: AgentDockProps) {
           </div>
         </aside>
 
-        <button type="button" className="agent-asset-button" onClick={() => navigateTo("/products")}>
+        <button type="button" className="agent-asset-button" onClick={() => setView("library")}>
           <Library size={17} />
-          资产库
+          资料库
         </button>
 
         <button type="button" className="agent-top-back" onClick={returnToPreviousPage}>
@@ -283,30 +351,18 @@ export default function AgentDock({ children }: AgentDockProps) {
         </button>
 
         <section className="agent-home">
-          <h1>{activeTitle}</h1>
+          <h1>{view === "library" ? "选择资料加入当前会话" : view === "actions" ? "选择一个快捷动作" : "你好，想创作什么？"}</h1>
 
-          <div className="agent-mode-tabs" aria-label="Agent modes">
-            <button
-              type="button"
-              className={view === "chat" ? "is-active" : ""}
-              onClick={() => setView("chat")}
-            >
+          <div className="agent-mode-tabs" aria-label="Agent 模式">
+            <button type="button" className={view === "chat" ? "is-active" : ""} onClick={() => setView("chat")}>
               <Bot size={18} />
               聊天
             </button>
-            <button
-              type="button"
-              className={view === "search" ? "is-active" : ""}
-              onClick={() => setView("search")}
-            >
+            <button type="button" className={view === "library" ? "is-active" : ""} onClick={() => setView("library")}>
               <Search size={18} />
-              搜索
+              资料库
             </button>
-            <button
-              type="button"
-              className={view === "apps" ? "is-active" : ""}
-              onClick={() => setView("apps")}
-            >
+            <button type="button" className={view === "actions" ? "is-active" : ""} onClick={() => setView("actions")}>
               <Grid2X2 size={18} />
               动作
             </button>
@@ -317,8 +373,13 @@ export default function AgentDock({ children }: AgentDockProps) {
           </div>
 
           <div className="agent-live-panel">
-            {view === "chat" && (
+            {view === "chat" && activeConversation && (
               <div className="agent-thread" aria-live="polite">
+                {activeConversation.references.length > 0 && (
+                  <div className="agent-panel-note">
+                    当前参考：{activeConversation.references.join("、")}
+                  </div>
+                )}
                 {activeConversation.messages.map((message) => (
                   <div key={message.id} className={`agent-message agent-message-${message.role}`}>
                     <span>{message.role === "agent" ? "Agent" : "你"}</span>
@@ -328,44 +389,33 @@ export default function AgentDock({ children }: AgentDockProps) {
               </div>
             )}
 
-            {view === "search" && (
+            {view === "library" && (
               <div className="agent-result-list" aria-live="polite">
-                <div className="agent-panel-note">
-                  {searchTerm ? `正在展示 “${searchTerm}” 的匹配结果` : "输入关键词后按发送，结果会在这里更新。"}
-                </div>
-                {filteredResults.length > 0 ? (
-                  filteredResults.map((result) => (
-                    <button
-                      type="button"
-                      key={`${result.type}-${result.title}`}
-                      onClick={() => {
-                        addExchange(`打开${result.type}：${result.title}`, `已打开 ${result.title}。`);
-                        navigateTo(result.path);
-                      }}
-                    >
-                      <strong>{result.type}</strong>
-                      <span>{result.title}</span>
-                      <small>{result.detail}</small>
-                    </button>
-                  ))
-                ) : (
-                  <div className="agent-empty-state">没有匹配结果，换个商品名、脚本名或项目名试试。</div>
-                )}
-              </div>
-            )}
-
-            {view === "apps" && (
-              <div className="agent-action-grid">
-                {quickActions.map(({ label, icon: Icon, reply, prompt, ...action }) => (
-                  <button key={label} type="button" onClick={() => runAction({ label, icon: Icon, reply, prompt, ...action })}>
-                    <Icon size={19} />
-                    <span>{label}</span>
-                    <small>{completedActions.includes(label) ? "已执行，可再次运行" : "点击后直接生成 Agent 回复"}</small>
+                <div className="agent-panel-note">点击资料会加入当前会话，不会离开当前页面。</div>
+                {libraryItems.map((item) => (
+                  <button type="button" key={item.id} onClick={() => addLibraryItem(item)}>
+                    <strong>{item.type}</strong>
+                    <span>{item.title}</span>
+                    <small>{item.detail}</small>
                   </button>
                 ))}
               </div>
             )}
 
+            {view === "actions" && (
+              <div className="agent-action-grid">
+                {quickActions.map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <button key={action.label} type="button" onClick={() => runAction(action)}>
+                      <Icon size={19} />
+                      <span>{action.label}</span>
+                      <small>点击后会写入当前会话历史</small>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <form
@@ -375,13 +425,13 @@ export default function AgentDock({ children }: AgentDockProps) {
               submitInput();
             }}
           >
-            <button type="button" className="agent-add-tile" aria-label="添加快捷内容" onClick={() => setView("apps")}>
+            <button type="button" className="agent-add-tile" aria-label="打开快捷动作" onClick={() => setView("actions")}>
               <Plus size={28} />
             </button>
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder={view === "search" ? "搜索商品、脚本、项目..." : "问问 ShopClip Agent"}
+              placeholder="问问 ShopClip Agent"
             />
             <input
               ref={fileInputRef}
@@ -397,11 +447,11 @@ export default function AgentDock({ children }: AgentDockProps) {
               <Wand2 size={16} />
               {model}
             </button>
-            <button type="button" className="agent-auto-button" aria-label="自动模式" onClick={() => setView("search")}>
+            <button type="button" className="agent-auto-button" aria-label="打开资料库" onClick={() => setView("library")}>
               <SlidersHorizontal size={19} />
-              自动
+              资料库
             </button>
-            <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={() => setView("apps")}>
+            <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={() => setView("actions")}>
               <Wrench size={19} />
               使用技能
             </button>
