@@ -6,12 +6,13 @@ interface AppLayoutProps {
   children: ReactNode;
   current: RouteKey;
   navigate: (route: RouteKey) => void;
+  onLogout: () => void;
 }
 
-export default function AppLayout({ children, current, navigate }: AppLayoutProps) {
+export default function AppLayout({ children, current, navigate, onLogout }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-white text-[#171719]">
-      <TopNav current={current} navigate={navigate} />
+      <TopNav current={current} navigate={navigate} onLogout={onLogout} />
       <main className="mx-auto w-full max-w-[1440px] px-8 py-16 lg:px-12">
         {children}
       </main>

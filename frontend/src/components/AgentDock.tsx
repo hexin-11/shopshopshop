@@ -74,8 +74,8 @@ type LibraryItem = {
   detail: string;
 };
 
-const agentHistoryFlag = "shopclip-agent";
-const STORAGE_KEY = "shopclip-agent-conversations";
+const agentHistoryFlag = "vibegen-agent";
+const STORAGE_KEY = "vibegen-agent-conversations";
 
 const libraryItems: LibraryItem[] = [
   {
@@ -139,7 +139,7 @@ const quickActions = [
 
 const firstConversation: Conversation = {
   id: 1,
-  title: "ShopClip 创作助手",
+  title: "VibeGen AI 创作助手",
   updatedAt: "今天",
   references: [],
   messages: [
@@ -701,7 +701,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                   submitInput();
                 }
               }}
-              placeholder="问问 ShopClip Agent"
+              placeholder="问问 VibeGen AI Agent"
               rows={2}
             />
             <input

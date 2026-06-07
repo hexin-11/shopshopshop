@@ -2,22 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import AgentDock from "./components/AgentDock";
 import AppLayout from "./components/AppLayout";
 import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import ProductsPage from "./pages/ProductsPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import VideoProjectsPage from "./pages/VideoProjectsPage";
 import ProjectWorkspacePage from "./pages/ProjectWorkspacePage";
-import SettingsPage from "./pages/SettingsPage";
 import type { RouteKey } from "./data/mockData";
 import { getRouteKeyFromPath, routePaths } from "./lib/routes";
 
-type Route = RouteKey | "login" | "register" | "projectWorkspace" | "productDetail";
+type Route = RouteKey | "login" | "projectWorkspace" | "productDetail";
+const AUTH_STORAGE_KEY = "vibegen-authenticated";
 
 const routeFromLocation = (): Route => {
   const p = window.location.pathname;
   if (p === "/login") return "login";
-  if (p === "/register") return "register";
+  if (p === "/register") return "login";
   if (p.startsWith("/projects/") || p.startsWith("/editor/")) return "projectWorkspace";
   if (p.startsWith("/products/")) return "productDetail";
   return getRouteKeyFromPath(p);
@@ -26,6 +25,9 @@ const routeFromLocation = (): Route => {
 export default function App() {
   const [route, setRoute] = useState<Route>(() => routeFromLocation());
   const [selectedProductId, setSelectedProductId] = useState<string>("prod-earphone");
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem(AUTH_STORAGE_KEY) === "true";
+  });
 
   useEffect(() => {
     const onPopState = () => setRoute(routeFromLocation());
@@ -35,8 +37,8 @@ export default function App() {
 
   const navigate = (next: Route) => {
     setRoute(next);
-    if (next === "login" || next === "register") {
-      window.history.pushState({}, "", `/${next}`); return;
+    if (next === "login") {
+      window.history.pushState({}, "", "/login"); return;
     }
     if (next === "projectWorkspace") {
       window.history.pushState({}, "", "/projects/p-earphone"); return;
@@ -58,10 +60,22 @@ export default function App() {
     window.history.pushState({}, "", `/products/${productId}`);
   };
 
+  const handleLogin = () => {
+    localStorage.setItem(AUTH_STORAGE_KEY, "true");
+    setIsAuthenticated(true);
+    navigate("dashboard");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setIsAuthenticated(false);
+    setRoute("login");
+    window.history.pushState({}, "", "/login");
+  };
+
   const page = useMemo(() => {
     switch (route) {
-      case "login":         return <LoginPage navigate={navigate} />;
-      case "register":      return <RegisterPage navigate={navigate} />;
+      case "login":         return <LoginPage navigate={navigate} onLogin={handleLogin} />;
       case "products":      return <ProductsPage onSelectProduct={selectProduct} />;
       case "productDetail": return (
         <ProductDetailPage
@@ -73,14 +87,21 @@ export default function App() {
       );
       case "projects":      return <VideoProjectsPage openProject={openProject} />;
       case "projectWorkspace": return <ProjectWorkspacePage navigate={(r) => navigate(r)} />;
-      case "settings":      return <SettingsPage />;
       default:              return <DashboardPage navigate={(r) => navigate(r)} />;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route, selectedProductId]);
+  }, [route, selectedProductId, isAuthenticated]);
+
+  if (!isAuthenticated) {
+    return <LoginPage navigate={navigate} onLogin={handleLogin} />;
+  }
 
   // 全屏页面（不用 AppLayout）
-  if (route === "login" || route === "register" || route === "projectWorkspace") {
+  if (route === "login") {
+    return page;
+  }
+
+  if (route === "projectWorkspace") {
     return <AgentDock>{page}</AgentDock>;
   }
 
@@ -89,7 +110,7 @@ export default function App() {
 
   return (
     <AgentDock>
-      <AppLayout current={navCurrent} navigate={(r) => navigate(r)}>
+      <AppLayout current={navCurrent} navigate={(r) => navigate(r)} onLogout={handleLogout}>
         {page}
       </AppLayout>
     </AgentDock>

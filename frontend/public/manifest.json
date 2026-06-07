@@ -1,6 +1,6 @@
 {
-	"name": "OpenCut",
-	"description": "A simple but powerful video editor that gets the job done. In your browser.",
+	"name": "VibeGen AI",
+	"description": "AI video creation and editing workspace.",
 	"display": "standalone",
 	"start_url": "/",
 	"icons": [

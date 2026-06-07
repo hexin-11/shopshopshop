@@ -1,17 +1,18 @@
-import { useState, useRef, useEffect } from "react";
-import { Bell, Settings, LogOut, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bell, ChevronDown, LogOut } from "lucide-react";
 import type { RouteKey } from "../data/mockData";
-import { navItems } from "../lib/routes";
 import { user as fallbackUser } from "../data/mockData";
+import { navItems } from "../lib/routes";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
 
 interface TopNavProps {
   current: RouteKey;
   navigate: (r: RouteKey) => void;
+  onLogout: () => void;
 }
 
-export default function TopNav({ current, navigate }: TopNavProps) {
+export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState(fallbackUser);
@@ -41,45 +42,35 @@ export default function TopNav({ current, navigate }: TopNavProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const mainNav = navItems.filter((item) => item.key !== "settings");
-
   return (
     <header
       className={cn(
         "sticky top-0 z-40 w-full transition-all duration-300",
         scrolled
-          ? "bg-white/90 backdrop-blur-xl border-b border-[#E5E7EB]"
-          : "bg-transparent border-b border-transparent"
+          ? "border-b border-[#E5E7EB] bg-white/90 backdrop-blur-xl"
+          : "border-b border-transparent bg-transparent",
       )}
     >
       <div className="mx-auto flex h-[90px] max-w-[1440px] items-center px-8 lg:px-12">
-        
-        {/* 左区：品牌名 siter.io style */}
         <div className="flex w-0 flex-1 items-center">
           <button
             onClick={() => navigate("dashboard")}
-            className="text-[24px] font-[900] tracking-[-0.03em] text-[#171719] hover:opacity-80 transition-opacity"
+            className="text-[24px] font-[900] tracking-[-0.03em] text-[#171719] transition-opacity hover:opacity-80"
           >
-            shopclip·ai
+            VibeGen AI
           </button>
         </div>
 
-        {/* 中区：导航 */}
-        <nav className="hidden md:flex items-center gap-12">
-          {mainNav.map(({ key, label }) => {
-            const isActive =
-              current === key ||
-              (current === ("productDetail" as RouteKey) && key === "products");
-
+        <nav className="hidden items-center gap-12 md:flex">
+          {navItems.map(({ key, label }) => {
+            const isActive = current === key;
             return (
               <button
                 key={key}
-                onClick={() => navigate(key as RouteKey)}
+                onClick={() => navigate(key)}
                 className={cn(
                   "text-[17px] font-bold transition-colors",
-                  isActive
-                    ? "text-[#171719]"
-                    : "text-[#171719]/60 hover:text-[#171719]"
+                  isActive ? "text-[#171719]" : "text-[#171719]/60 hover:text-[#171719]",
                 )}
               >
                 {label}
@@ -88,21 +79,26 @@ export default function TopNav({ current, navigate }: TopNavProps) {
           })}
         </nav>
 
-        {/* 右区：工具 */}
         <div className="flex w-0 flex-1 items-center justify-end gap-5">
-          <button className="text-[#171719]/60 hover:text-[#171719] transition-colors">
+          <button
+            aria-label="通知"
+            className="text-[#171719]/60 transition-colors hover:text-[#171719]"
+          >
             <Bell size={20} strokeWidth={2} />
           </button>
-          
+
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen((v) => !v)}
-              className="flex items-center gap-2 text-[#171719]/80 hover:text-[#171719] transition-colors"
+              className="flex items-center gap-2 text-[#171719]/80 transition-colors hover:text-[#171719]"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#4684EE] text-sm font-bold text-white shadow-sm">
                 {user.avatar}
               </div>
-              <ChevronDown size={14} className={cn("transition-transform", dropdownOpen && "rotate-180")} />
+              <ChevronDown
+                size={14}
+                className={cn("transition-transform", dropdownOpen && "rotate-180")}
+              />
             </button>
 
             {dropdownOpen && (
@@ -113,13 +109,12 @@ export default function TopNav({ current, navigate }: TopNavProps) {
                 </div>
                 <div className="my-2 h-px bg-[#E5E7EB]" />
                 <button
-                  onClick={() => { navigate("settings"); setDropdownOpen(false); }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] text-[#171719]/80 transition-colors hover:bg-neutral-50 hover:text-[#171719]"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    onLogout();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
                 >
-                  <Settings size={16} className="text-[#171719]/50" />
-                  偏好设置
-                </button>
-                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] text-red-500 transition-colors hover:bg-red-50 hover:text-red-600">
                   <LogOut size={16} className="text-red-400" />
                   退出登录
                 </button>
