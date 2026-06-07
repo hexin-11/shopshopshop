@@ -1,40 +1,66 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
-  Bot,
   Clapperboard,
   FileText,
-  Grid2X2,
+  Film,
   Image,
-  Mic,
-  MicOff,
   MoreHorizontal,
   Paperclip,
   Pencil,
   Pin,
   PinOff,
   Plus,
-  Search,
   Send,
-  Settings,
-  SlidersHorizontal,
+  Sparkles,
   Trash2,
   Wand2,
   Wrench,
 } from "lucide-react";
+import { api } from "../lib/api";
 
 interface AgentDockProps {
   children: ReactNode;
 }
 
-type AgentView = "chat" | "library" | "actions";
 type ChatMessage = {
-  id: number;
+  id: number | string;
   role: "user" | "agent";
   text: string;
+  thinking?: string[];
+  changes?: AgentChange[];
+};
+type AgentChange = {
+  type: string;
+  target: string;
+  summary: string;
+  newText?: string;
+  status?: string;
+  imageCandidates?: AgentImageCandidate[];
+  videoPlan?: AgentVideoPlan;
+  editActions?: AgentEditAction[];
+};
+type AgentImageCandidate = {
+  id: string;
+  title: string;
+  style?: string;
+  prompt: string;
+  imageUrl: string;
+};
+type AgentVideoPlan = {
+  duration?: number;
+  aspectRatio?: string;
+  motion?: string;
+  prompt?: string;
+  shots?: string[];
+};
+type AgentEditAction = {
+  action: string;
+  target: string;
+  value: string;
 };
 type Conversation = {
-  id: number;
+  id: number | string;
   title: string;
   updatedAt: string;
   pinned?: boolean;
@@ -92,14 +118,24 @@ const quickActions = [
     icon: Image,
   },
   {
+    label: "文生图",
+    prompt: "帮我生成 3 张适合短视频开场的商品图片候选，先问清楚风格也可以",
+    reply: "我会先确认商品和视觉风格，再给你 3 张候选图，选中后可以继续图生视频。",
+    icon: Sparkles,
+  },
+  {
+    label: "图生视频",
+    prompt: "用我选中的图片生成一个 6 秒图生视频方案，包含运镜、字幕和节奏",
+    reply: "我会把选中的图片转成视频任务方案，并拆出运镜、字幕和镜头节奏。",
+    icon: Film,
+  },
+  {
     label: "项目推进",
     prompt: "把当前脚本推进到视频生成队列",
     reply: "已把当前工作流整理为生成任务：脚本、素材、口播和封面都进入待处理清单。你可以从项目页继续查看。",
     icon: Clapperboard,
   },
 ];
-
-const modelOptions = ["Fast", "Pro", "Deep"];
 
 const firstConversation: Conversation = {
   id: 1,
@@ -122,13 +158,7 @@ const createConversation = (): Conversation => {
     title: "新会话",
     updatedAt: "刚刚",
     references: [],
-    messages: [
-      {
-        id: id + 1,
-        role: "agent",
-        text: "新会话已创建。你可以输入想法、脚本需求，或者从资料库添加参考内容。",
-      },
-    ],
+    messages: [],
   };
 };
 
@@ -143,13 +173,33 @@ const loadConversations = () => {
   }
 };
 
+const normalizeRemoteConversations = (items: unknown[]): Conversation[] =>
+  items
+    .map((item) => item as Partial<Conversation>)
+    .filter((item) => item.id && item.title)
+    .map((item) => ({
+      id: item.id as number | string,
+      title: String(item.title),
+      updatedAt: String(item.updatedAt || "刚刚"),
+      pinned: Boolean(item.pinned),
+      references: Array.isArray(item.references) ? item.references.map(String) : [],
+      messages: Array.isArray(item.messages) ? item.messages as ChatMessage[] : [],
+    }));
+
 const makeConversationTitle = (text: string) => {
   const clean = text.trim().replace(/\s+/g, " ");
   if (!clean) return "新会话";
   return clean.length > 16 ? `${clean.slice(0, 16)}...` : clean;
 };
 
+const cleanAgentDisplayText = (text: string) =>
+  text
+    .replace(/(?:Fast|Pro|Deep|Standard)\s*模式已收到。?\s*/g, "")
+    .replace(/我先围绕/g, "我已围绕")
+    .trim();
+
 const getAgentReturnTarget = () => `${window.location.pathname}${window.location.search}`;
+const defaultAgentModel = "Standard";
 
 export default function AgentDock({ children }: AgentDockProps) {
   const initialConversationsRef = useRef<Conversation[] | null>(null);
@@ -158,14 +208,13 @@ export default function AgentDock({ children }: AgentDockProps) {
   }
 
   const [open, setOpen] = useState(() => window.location.hash === "#agent");
-  const [view, setView] = useState<AgentView>("chat");
   const [input, setInput] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>(initialConversationsRef.current);
   const [activeConversationId, setActiveConversationId] = useState(initialConversationsRef.current[0]?.id ?? firstConversation.id);
   const [attachments, setAttachments] = useState<string[]>([]);
-  const [listening, setListening] = useState(false);
-  const [model, setModel] = useState("Pro");
-  const [conversationMenuId, setConversationMenuId] = useState<number | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [conversationMenuId, setConversationMenuId] = useState<number | string | null>(null);
+  const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeConversation = useMemo(
@@ -177,7 +226,9 @@ export default function AgentDock({ children }: AgentDockProps) {
     () =>
       [...conversations].sort((a, b) => {
         if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-        return b.id - a.id;
+        const bTime = new Date(b.updatedAt).getTime() || Number(b.id) || 0;
+        const aTime = new Date(a.updatedAt).getTime() || Number(a.id) || 0;
+        return bTime - aTime;
       }),
     [conversations],
   );
@@ -185,6 +236,26 @@ export default function AgentDock({ children }: AgentDockProps) {
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
   }, [conversations]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.agentConversations()
+      .then((result) => {
+        if (cancelled) return;
+        const remote = normalizeRemoteConversations(result.items || []);
+        if (!remote.length) return;
+        setConversations(remote);
+        setActiveConversationId((current) =>
+          remote.some((conversation) => conversation.id === current) ? current : remote[0].id,
+        );
+      })
+      .catch(() => {
+        // Local history remains available when the backend is not running.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (window.location.hash === "#agent" && !window.history.state?.[agentHistoryFlag]) {
@@ -203,8 +274,7 @@ export default function AgentDock({ children }: AgentDockProps) {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const openAgent = (nextView: AgentView = "chat") => {
-    setView(nextView);
+  const openAgent = () => {
     if (!open && window.location.hash !== "#agent") {
       const returnTo = getAgentReturnTarget();
       window.history.pushState(
@@ -229,19 +299,18 @@ export default function AgentDock({ children }: AgentDockProps) {
     setActiveConversationId(next.id);
     setInput("");
     setAttachments([]);
-    setListening(false);
     setConversationMenuId(null);
-    setView("chat");
+    setSkillMenuOpen(false);
   };
 
-  const selectConversation = (id: number) => {
+  const selectConversation = (id: number | string) => {
     setActiveConversationId(id);
     setInput("");
     setConversationMenuId(null);
-    setView("chat");
+    setSkillMenuOpen(false);
   };
 
-  const togglePinConversation = (id: number) => {
+  const togglePinConversation = (id: number | string) => {
     setConversations((prev) =>
       prev.map((conversation) =>
         conversation.id === id
@@ -252,7 +321,7 @@ export default function AgentDock({ children }: AgentDockProps) {
     setConversationMenuId(null);
   };
 
-  const renameConversation = (id: number) => {
+  const renameConversation = (id: number | string) => {
     const current = conversations.find((conversation) => conversation.id === id);
     const nextTitle = window.prompt("重命名会话", current?.title ?? "新会话");
     if (!nextTitle?.trim()) return;
@@ -267,7 +336,7 @@ export default function AgentDock({ children }: AgentDockProps) {
     setConversationMenuId(null);
   };
 
-  const deleteConversation = (id: number) => {
+  const deleteConversation = (id: number | string) => {
     setConversations((prev) => {
       const remaining = prev.filter((conversation) => conversation.id !== id);
       if (remaining.length === 0) {
@@ -282,26 +351,6 @@ export default function AgentDock({ children }: AgentDockProps) {
       return remaining;
     });
     setConversationMenuId(null);
-  };
-
-  const addExchange = (text: string, reply: string) => {
-    const base = Date.now();
-    setConversations((prev) =>
-      prev.map((conversation) => {
-        if (conversation.id !== activeConversationId) return conversation;
-        const shouldRename = conversation.title === firstConversation.title || conversation.title === "新会话";
-        return {
-          ...conversation,
-          title: shouldRename ? makeConversationTitle(text) : conversation.title,
-          updatedAt: "刚刚",
-          messages: [
-            ...conversation.messages,
-            { id: base, role: "user", text },
-            { id: base + 1, role: "agent", text: reply },
-          ],
-        };
-      }),
-    );
   };
 
   const addLibraryItem = (item: LibraryItem) => {
@@ -325,22 +374,95 @@ export default function AgentDock({ children }: AgentDockProps) {
       ),
     );
     setInput((current) => (current.trim() ? `${current.trim()}，参考${item.title}` : `参考${item.title}，`));
-    setView("chat");
   };
 
-  const submitInput = () => {
+  const submitInput = async () => {
     const text = input.trim();
-    if (!text && attachments.length === 0) return;
+    if ((!text && attachments.length === 0) || agentLoading) return;
 
     const attachmentText = attachments.length > 0 ? `，并附带 ${attachments.length} 个文件` : "";
-    addExchange(
-      text || `分析这些附件${attachmentText}`,
-      `${model} 模式已收到${attachmentText}。我会按商品、素材、脚本、项目进度四类拆解，并把下一步动作整理在当前会话里。`,
-    );
+    const userText = text || `分析这些附件${attachmentText}`;
+    const currentAttachments = [...attachments];
+    const currentMessages = activeConversation?.messages || [];
+    const currentReferences = activeConversation?.references || [];
     setInput("");
     setAttachments([]);
-    setListening(false);
-    setView("chat");
+    setSkillMenuOpen(false);
+
+    const base = Date.now();
+    setConversations((prev) =>
+      prev.map((conversation) => {
+        if (conversation.id !== activeConversationId) return conversation;
+        const shouldRename = conversation.title === firstConversation.title || conversation.title === "新会话";
+        return {
+          ...conversation,
+          title: shouldRename ? makeConversationTitle(userText) : conversation.title,
+          updatedAt: "刚刚",
+          messages: [
+            ...conversation.messages,
+            { id: base, role: "user", text: userText },
+            {
+              id: base + 1,
+              role: "agent",
+              text: "正在思考怎么回复你...",
+              thinking: ["读取上下文", "判断是普通聊天还是创作指令", "组织回复"],
+            },
+          ],
+        };
+      }),
+    );
+
+    setAgentLoading(true);
+    try {
+      const result = await api.agentChat({
+        message: userText,
+        conversationId: activeConversationId,
+        model: defaultAgentModel,
+        attachments: currentAttachments,
+        references: currentReferences,
+        messages: currentMessages,
+      });
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === activeConversationId
+            ? {
+                ...conversation,
+                updatedAt: "刚刚",
+                messages: conversation.messages.map((message) =>
+                  message.id === base + 1
+                    ? {
+                        ...message,
+                        text: result.reply,
+                        thinking: result.thinking || [],
+                        changes: result.changes || [],
+                      }
+                    : message,
+                ),
+              }
+            : conversation,
+        ),
+      );
+    } catch (error) {
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === activeConversationId
+            ? {
+                ...conversation,
+                messages: conversation.messages.map((message) =>
+                  message.id === base + 1
+                    ? {
+                        ...message,
+                        text: error instanceof Error ? `后端 Agent 暂时不可用：${error.message}` : "后端 Agent 暂时不可用。",
+                      }
+                    : message,
+                ),
+              }
+            : conversation,
+        ),
+      );
+    } finally {
+      setAgentLoading(false);
+    }
   };
 
   const handleFiles = (files: FileList | null) => {
@@ -348,14 +470,39 @@ export default function AgentDock({ children }: AgentDockProps) {
     setAttachments((prev) => [...prev, ...Array.from(files).map((file) => file.name)]);
   };
 
-  const runAction = (action: (typeof quickActions)[number]) => {
-    addExchange(action.prompt, action.reply);
-    setView("chat");
+  const selectImageCandidate = (candidate: AgentImageCandidate) => {
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === activeConversationId
+          ? {
+              ...conversation,
+              references: Array.from(new Set([...conversation.references, candidate.title])),
+              updatedAt: "刚刚",
+              messages: [
+                ...conversation.messages,
+                {
+                  id: Date.now(),
+                  role: "agent",
+                  text: `已选择「${candidate.title}」。你可以继续让我用这张图做图生视频，或者让我改风格、构图、光线。`,
+                },
+              ],
+            }
+          : conversation,
+      ),
+    );
+    setInput(`用「${candidate.title}」生成 6 秒图生视频，风格：${candidate.style || "高级电商"}，运镜要自然`);
   };
 
-  const rotateModel = () => {
-    setModel((current) => modelOptions[(modelOptions.indexOf(current) + 1) % modelOptions.length]);
+  const requestVideoFromImage = (candidate: AgentImageCandidate) => {
+    setInput(`用「${candidate.title}」做一个 6 秒图生视频，风格参考：${candidate.style || "高级电商"}，提示词：${candidate.prompt}`);
   };
+
+  const runAction = (action: (typeof quickActions)[number]) => {
+    setInput(action.prompt);
+    setSkillMenuOpen(false);
+  };
+
+  const isEmptyConversation = !activeConversation || activeConversation.messages.length === 0;
 
   return (
     <div className={`agent-shell ${open ? "agent-shell-open" : ""}`}>
@@ -366,7 +513,7 @@ export default function AgentDock({ children }: AgentDockProps) {
           type="button"
           aria-label="打开 Agent"
           className="agent-orb"
-          onClick={() => openAgent("chat")}
+          onClick={openAgent}
         >
           <span className="agent-orb-ring" />
           <span className="agent-orb-core">
@@ -385,6 +532,15 @@ export default function AgentDock({ children }: AgentDockProps) {
               新会话
             </button>
           </div>
+          <div className="agent-sidebar-library" aria-label="资料库">
+            <strong>资料库</strong>
+            {libraryItems.map((item) => (
+              <button type="button" key={item.id} onClick={() => addLibraryItem(item)}>
+                <span>{item.title}</span>
+                <small>{item.type} · {item.detail}</small>
+              </button>
+            ))}
+          </div>
           <div className="agent-history-list">
             {sortedConversations.map((conversation) => (
               <div
@@ -397,7 +553,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                   onClick={() => selectConversation(conversation.id)}
                 >
                   <span>{conversation.pinned ? `★ ${conversation.title}` : conversation.title}</span>
-                  <small>{conversation.messages[conversation.messages.length - 1]?.text ?? "暂无消息"}</small>
+                  <small>{cleanAgentDisplayText(conversation.messages[conversation.messages.length - 1]?.text ?? "暂无消息")}</small>
                 </button>
                 <button
                   type="button"
@@ -438,30 +594,11 @@ export default function AgentDock({ children }: AgentDockProps) {
           返回
         </button>
 
-        <section className="agent-home">
-          <h1>{view === "library" ? "选择资料加入当前会话" : view === "actions" ? "选择一个快捷动作" : "你好，想创作什么？"}</h1>
-
-          <div className="agent-mode-tabs" aria-label="Agent 模式">
-            <button type="button" className={view === "chat" ? "is-active" : ""} onClick={() => setView("chat")}>
-              <Bot size={18} />
-              聊天
-            </button>
-            <button type="button" className={view === "library" ? "is-active" : ""} onClick={() => setView("library")}>
-              <Search size={18} />
-              资料库
-            </button>
-            <button type="button" className={view === "actions" ? "is-active" : ""} onClick={() => setView("actions")}>
-              <Grid2X2 size={18} />
-              动作
-            </button>
-            <button type="button" onClick={rotateModel}>
-              <Settings size={18} />
-              {model}
-            </button>
-          </div>
+        <section className={`agent-home ${isEmptyConversation ? "agent-home-empty" : ""}`}>
+          {isEmptyConversation && <h1>你好，想创作什么？</h1>}
 
           <div className="agent-live-panel">
-            {view === "chat" && activeConversation && (
+            {activeConversation && (
               <div className="agent-thread" aria-live="polite">
                 {activeConversation.references.length > 0 && (
                   <div className="agent-panel-note">
@@ -471,37 +608,76 @@ export default function AgentDock({ children }: AgentDockProps) {
                 {activeConversation.messages.map((message) => (
                   <div key={message.id} className={`agent-message agent-message-${message.role}`}>
                     <span>{message.role === "agent" ? "Agent" : "你"}</span>
-                    <p>{message.text}</p>
+                    <p>{message.role === "agent" ? cleanAgentDisplayText(message.text) : message.text}</p>
+                    {message.thinking && message.thinking.length > 0 && (
+                      <div className="agent-thinking-list">
+                        {message.thinking.map((step, index) => (
+                          <small key={`${message.id}-thinking-${index}`}>{step}</small>
+                        ))}
+                      </div>
+                    )}
+                    {message.changes && message.changes.length > 0 && (
+                      <div className="agent-change-list">
+                        {message.changes.map((change, index) => (
+                          <article key={`${message.id}-${index}`} className="agent-change-card">
+                            <strong>{change.target}</strong>
+                            <small>{change.type}</small>
+                            <p>{change.summary}</p>
+                            {change.newText && <blockquote>{change.newText}</blockquote>}
+                            {change.imageCandidates && change.imageCandidates.length > 0 && (
+                              <div className="agent-image-grid">
+                                {change.imageCandidates.map((candidate) => (
+                                  <div key={candidate.id} className="agent-image-option">
+                                    <img src={candidate.imageUrl} alt={candidate.title} />
+                                    <div>
+                                      <strong>{candidate.title}</strong>
+                                      <small>{candidate.style || "默认风格"}</small>
+                                    </div>
+                                    <p>{candidate.prompt}</p>
+                                    <div className="agent-card-actions">
+                                      <button type="button" onClick={() => selectImageCandidate(candidate)}>
+                                        选这张
+                                      </button>
+                                      <button type="button" onClick={() => requestVideoFromImage(candidate)}>
+                                        图生视频
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {change.videoPlan && (
+                              <div className="agent-video-plan">
+                                <div>
+                                  <strong>{change.videoPlan.duration || 6}s</strong>
+                                  <span>{change.videoPlan.aspectRatio || "9:16"}</span>
+                                  <span>{change.videoPlan.motion || "平滑运镜"}</span>
+                                </div>
+                                {change.videoPlan.prompt && <p>{change.videoPlan.prompt}</p>}
+                                {change.videoPlan.shots && (
+                                  <ol>
+                                    {change.videoPlan.shots.map((shot) => (
+                                      <li key={shot}>{shot}</li>
+                                    ))}
+                                  </ol>
+                                )}
+                              </div>
+                            )}
+                            {change.editActions && change.editActions.length > 0 && (
+                              <div className="agent-edit-actions">
+                                {change.editActions.map((item) => (
+                                  <span key={`${item.action}-${item.target}`}>
+                                    {item.action} · {item.target}：{item.value}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </article>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
-              </div>
-            )}
-
-            {view === "library" && (
-              <div className="agent-result-list" aria-live="polite">
-                <div className="agent-panel-note">点击资料会加入当前会话，不会离开当前页面。</div>
-                {libraryItems.map((item) => (
-                  <button type="button" key={item.id} onClick={() => addLibraryItem(item)}>
-                    <strong>{item.type}</strong>
-                    <span>{item.title}</span>
-                    <small>{item.detail}</small>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {view === "actions" && (
-              <div className="agent-action-grid">
-                {quickActions.map((action) => {
-                  const Icon = action.icon;
-                  return (
-                    <button key={action.label} type="button" onClick={() => runAction(action)}>
-                      <Icon size={19} />
-                      <span>{action.label}</span>
-                      <small>点击后会写入当前会话历史</small>
-                    </button>
-                  );
-                })}
               </div>
             )}
           </div>
@@ -513,13 +689,20 @@ export default function AgentDock({ children }: AgentDockProps) {
               submitInput();
             }}
           >
-            <button type="button" className="agent-add-tile" aria-label="打开快捷动作" onClick={() => setView("actions")}>
+            <button type="button" className="agent-add-tile" aria-label="附加文件" onClick={() => fileInputRef.current?.click()}>
               <Plus size={28} />
             </button>
-            <input
+            <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  submitInput();
+                }
+              }}
               placeholder="问问 ShopClip Agent"
+              rows={2}
             />
             <input
               ref={fileInputRef}
@@ -531,35 +714,31 @@ export default function AgentDock({ children }: AgentDockProps) {
             <button type="button" className="agent-attach-button" aria-label="附加文件" onClick={() => fileInputRef.current?.click()}>
               <Paperclip size={20} />
             </button>
-            <button type="button" className="agent-model-button" onClick={rotateModel}>
-              <Wand2 size={16} />
-              {model}
-            </button>
-            <button type="button" className="agent-auto-button" aria-label="打开资料库" onClick={() => setView("library")}>
-              <SlidersHorizontal size={19} />
-              资料库
-            </button>
-            <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={() => setView("actions")}>
+            <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={() => setSkillMenuOpen((value) => !value)}>
               <Wrench size={19} />
               使用技能
             </button>
-            <button
-              type="button"
-              aria-label={listening ? "停止语音输入" : "语音输入"}
-              className={listening ? "is-listening" : ""}
-              onClick={() => setListening((value) => !value)}
-            >
-              {listening ? <MicOff size={22} /> : <Mic size={22} />}
-            </button>
-            <button type="submit" aria-label="发送给 Agent" className="agent-send-inline">
+            <button type="submit" aria-label="发送给 Agent" className="agent-send-inline" disabled={agentLoading}>
               <Send size={18} />
             </button>
+            {skillMenuOpen && (
+              <div className="agent-skill-menu">
+                {quickActions.map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <button key={action.label} type="button" onClick={() => runAction(action)}>
+                      <Icon size={17} />
+                      <span>{action.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </form>
 
-          {(attachments.length > 0 || listening) && (
+          {attachments.length > 0 && (
             <div className="agent-status-strip">
               {attachments.length > 0 && <span>已附加：{attachments.join("、")}</span>}
-              {listening && <span>正在监听语音输入...</span>}
             </div>
           )}
         </section>

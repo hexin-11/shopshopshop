@@ -146,3 +146,4 @@ vite.config.ts.timestamp-*
 backend/uploads/*
 !backend/uploads/.gitkeep
 backend/data/*.local.json
+backend/data/agentConversations.json

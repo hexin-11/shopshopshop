@@ -118,4 +118,47 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+
+  async agentChat(payload: Record<string, unknown>) {
+    return requestJson<{
+      reply: string;
+      thinking?: string[];
+      changes?: Array<{
+        type: string;
+        target: string;
+        summary: string;
+        newText?: string;
+        status?: string;
+        imageCandidates?: Array<{
+          id: string;
+          title: string;
+          style?: string;
+          prompt: string;
+          imageUrl: string;
+        }>;
+        videoPlan?: {
+          duration?: number;
+          aspectRatio?: string;
+          motion?: string;
+          prompt?: string;
+          shots?: string[];
+        };
+        editActions?: Array<{
+          action: string;
+          target: string;
+          value: string;
+        }>;
+      }>;
+      provider?: string;
+      model?: string;
+      conversation?: unknown;
+    }>("/api/agent/chat", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async agentConversations() {
+    return requestJson<{ items: unknown[]; store?: string }>("/api/agent/conversations");
+  },
 };

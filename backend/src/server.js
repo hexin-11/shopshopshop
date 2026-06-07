@@ -9,14 +9,19 @@ import { createDatabaseAssetStore } from "./storage/databaseAssetStore.js";
 import { createDatabaseAppStore } from "./storage/databaseAppStore.js";
 import { createJsonAssetStore } from "./storage/jsonAssetStore.js";
 import { createJsonAppStore } from "./storage/jsonAppStore.js";
+import { createJsonAgentStore } from "./storage/jsonAgentStore.js";
+import { runAgentChat } from "./agent/chatAgent.js";
+import { loadEnvFile } from "./config/env.js";
 
 const rootDir = fileURLToPath(new URL("..", import.meta.url));
+await loadEnvFile(rootDir);
 const uploadDir = join(rootDir, "uploads");
 const port = Number(process.env.PORT || 8787);
 const storeType = process.env.ASSET_STORE || "json";
 const appStoreType = process.env.APP_STORE || "json";
 const assetStore = storeType === "database" ? createDatabaseAssetStore() : createJsonAssetStore({ rootDir });
 const appStore = appStoreType === "database" ? createDatabaseAppStore() : createJsonAppStore({ rootDir });
+const agentStore = createJsonAgentStore({ rootDir });
 
 const assetTypes = new Set(["商品图片", "商品视频", "生活方式图", "参考视频", "音频 / BGM"]);
 const editableFields = new Set(["fileName", "type", "category", "tags", "uploader", "mimeType", "size"]);
@@ -159,6 +164,9 @@ function buildDatabaseManifest() {
       { name: "videoProjects", purpose: "视频项目列表、权限、比例、进度、负责人" },
       { name: "renderJobs", purpose: "生成/渲染任务、进度、Trace Terminal 日志" },
       { name: "comments", purpose: "项目协作评论、目标镜头、解决状态" },
+      { name: "agentConversations", purpose: "客户和 Agent 的历史会话、置顶状态和参考资料" },
+      { name: "agentMessages", purpose: "每条用户/Agent 消息、思考摘要和结构化修改结果" },
+      { name: "agentChangeEvents", purpose: "脚本、字幕、视频节奏、素材替换等 Agent 修改建议事件" },
       { name: "analyticsSnapshots", purpose: "仪表盘指标卡片和阶段性统计快照" },
       { name: "platformPerformance", purpose: "TikTok、YouTube、Instagram 等平台趋势数据" },
       { name: "auditLogs", purpose: "后续记录创建、更新、发布、渲染等操作审计" },
@@ -169,6 +177,80 @@ function buildDatabaseManifest() {
       { name: "assetFiles", path: "backend/uploads", purpose: "素材原文件、渲染输入和导出视频" }
     ]
   };
+}
+
+function makeTitle(text) {
+  const clean = String(text || "").trim().replace(/\s+/g, " ");
+  if (!clean) return "新会话";
+  return clean.length > 18 ? `${clean.slice(0, 18)}...` : clean;
+}
+
+function normalizeConversation(conversation) {
+  return {
+    id: conversation.id,
+    title: conversation.title || "新会话",
+    updatedAt: conversation.updatedAt || conversation.createdAt || new Date().toISOString(),
+    pinned: Boolean(conversation.pinned),
+    references: Array.isArray(conversation.references) ? conversation.references : [],
+    messages: Array.isArray(conversation.messages) ? conversation.messages : [],
+  };
+}
+
+async function listAgentConversations() {
+  const data = await agentStore.read();
+  return (data.conversations || []).map(normalizeConversation);
+}
+
+async function saveAgentExchange(payload, result) {
+  const data = await agentStore.read();
+  const now = new Date().toISOString();
+  const conversations = Array.isArray(data.conversations) ? data.conversations : [];
+  const messageText = String(payload.message || "分析附件");
+  const conversationId = String(payload.conversationId || createId("agent-conv"));
+  let conversation = conversations.find((item) => String(item.id) === conversationId);
+
+  if (!conversation) {
+    conversation = {
+      id: conversationId,
+      title: makeTitle(messageText),
+      pinned: false,
+      references: Array.isArray(payload.references) ? payload.references.map(String) : [],
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+    };
+    conversations.unshift(conversation);
+  }
+
+  if (!conversation.title || conversation.title === "新会话") {
+    conversation.title = makeTitle(messageText);
+  }
+  conversation.references = Array.from(new Set([...(conversation.references || []), ...((payload.references || []).map(String))]));
+  conversation.updatedAt = now;
+  conversation.messages = [
+    ...(conversation.messages || []),
+    {
+      id: createId("agent-msg"),
+      role: "user",
+      text: messageText,
+      attachments: Array.isArray(payload.attachments) ? payload.attachments.map(String) : [],
+      createdAt: now,
+    },
+    {
+      id: createId("agent-msg"),
+      role: "agent",
+      text: result.reply,
+      thinking: Array.isArray(result.thinking) ? result.thinking : [],
+      changes: Array.isArray(result.changes) ? result.changes : [],
+      provider: result.provider,
+      model: result.model,
+      createdAt: now,
+    },
+  ];
+
+  data.conversations = conversations;
+  await agentStore.write(data);
+  return normalizeConversation(conversation);
 }
 
 function validateCreatePayload(payload) {
@@ -297,6 +379,34 @@ async function handleApi(req, res) {
       analytics: data.analyticsSnapshots,
       platformPerformance: data.platformPerformance
     });
+  }
+
+  if (pathname === "/api/agent/conversations" && req.method === "GET") {
+    return sendJson(res, 200, { items: await listAgentConversations(), store: agentStore.name });
+  }
+
+  if (pathname === "/api/agent/chat" && req.method === "POST") {
+    let payload;
+    try {
+      payload = await readBody(req);
+    } catch (error) {
+      return badRequest(res, error.message);
+    }
+
+    if (!payload.message && !payload.attachments?.length) {
+      return badRequest(res, "message 或 attachments 必填");
+    }
+
+    try {
+      const result = await runAgentChat(payload);
+      const conversation = await saveAgentExchange(payload, result);
+      return sendJson(res, 200, { ...result, conversation });
+    } catch (error) {
+      return sendJson(res, error.statusCode || 500, {
+        message: error.message || "Agent 暂时无法回复",
+        details: error.details,
+      });
+    }
   }
 
   if (pathname === "/api/dashboard" && req.method === "GET") {
