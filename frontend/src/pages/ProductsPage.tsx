@@ -1,7 +1,8 @@
 import { ArrowUpRight, Package, Search, SlidersHorizontal, ArrowDownAZ } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { catalog } from "../data/mockData";
+import { api } from "../lib/api";
 import { AddProductDialog } from "../components/product/AddProductDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 
@@ -9,10 +10,18 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
   const [sortBy, setSortBy] = useState("latest");
+  const [products, setProducts] = useState<any[]>([...catalog]);
 
-  const categories = ["全部", ...Array.from(new Set(catalog.map((p) => p.category)))];
+  useEffect(() => {
+    api.products().then((items) => setProducts(items as any[]));
+  }, []);
 
-  const filtered = catalog.filter((p) => {
+  const categories = useMemo(
+    () => ["全部", ...Array.from(new Set(products.map((p) => p.category)))],
+    [products]
+  );
+
+  const filtered = products.filter((p) => {
     const matchQuery = !query || p.name.toLowerCase().includes(query.toLowerCase()) || p.brand.toLowerCase().includes(query.toLowerCase());
     const matchCat = category === "全部" || p.category === category;
     return matchQuery && matchCat;
@@ -31,7 +40,7 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
           <h1 className="text-[32px] font-bold text-[#171719] tracking-tight">商品库</h1>
           <p className="mt-2 text-[16px] text-[#171719]/60">集中管理您的所有带货商品，并生成专属视频。</p>
         </div>
-        <AddProductDialog />
+        <AddProductDialog onCreated={(product) => setProducts((prev) => [product, ...prev])} />
       </div>
 
       {/* 搜索 + 分类过滤 */}

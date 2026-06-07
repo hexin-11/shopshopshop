@@ -29,6 +29,7 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { assets as mockAssets, catalog, productScripts, dashboardMetrics, platformPerformance } from "../data/mockData";
+import { api } from "../lib/api";
 import { CreateProjectWizard } from "../components/project/CreateProjectWizard";
 import { EditProductDialog } from "../components/product/EditProductDialog";
 import {
@@ -180,6 +181,9 @@ export default function ProductDetailPage({
 }: ProductDetailPageProps) {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [product, setProduct] = useState<any>(catalog.find((p) => p.id === productId) ?? catalog[0]);
+  const [assetList, setAssetList] = useState<any[]>(mockAssets);
+  const [scripts, setScripts] = useState<any[]>(productScripts[productId] ?? []);
 
   // --- Product State ---
   const [localProduct, setLocalProduct] = useState<any>(
@@ -188,7 +192,7 @@ export default function ProductDetailPage({
 
   // --- Asset Library State ---
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
-  const [localAssets, setLocalAssets] = useState(mockAssets);
+  const [localAssets, setLocalAssets] = useState<any[]>(mockAssets);
   const [mainImageId, setMainImageId] = useState<string>("产品正面主图_4K.jpg"); // Mock default
   const [activeCategory, setActiveCategory] = useState<"all" | "image" | "video" | "audio">("all");
   const [assetToSetMain, setAssetToSetMain] = useState<string | null>(null);
@@ -201,7 +205,26 @@ export default function ProductDetailPage({
   const [localScript, setLocalScript] = useState<any | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const scripts = productScripts[productId] ?? [];
+  useEffect(() => {
+    const defaultProduct = catalog.find((p) => p.id === productId) ?? catalog[0];
+    setProduct(defaultProduct);
+    setLocalProduct(defaultProduct);
+    setAssetList(mockAssets);
+    setLocalAssets(mockAssets);
+    setScripts(productScripts[productId] ?? []);
+
+    api.product(productId).then((p) => {
+      setProduct(p);
+      setLocalProduct(p);
+    });
+    api.productAssets(productId).then((items) => {
+      setAssetList(items as any[]);
+      setLocalAssets(items as any[]);
+    });
+    api.productScripts(productId).then((items) => {
+      setScripts(items as any[]);
+    });
+  }, [productId]);
 
   const filteredAssets = localAssets.filter(asset => 
     activeCategory === "all" || getAssetCategory(asset.type) === activeCategory
@@ -841,8 +864,13 @@ export default function ProductDetailPage({
           </div>
         </div>
       </div>
-      
-      <CreateProjectWizard open={isWizardOpen} onOpenChange={setIsWizardOpen} />
+      <CreateProjectWizard
+        open={isWizardOpen}
+        onOpenChange={setIsWizardOpen}
+        product={product}
+        scripts={scripts}
+        onCreated={(project) => openProject(project.id)}
+      />
 
       <AlertDialog open={!!assetToSetMain} onOpenChange={(open) => !open && setAssetToSetMain(null)}>
         <AlertDialogContent>

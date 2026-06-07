@@ -1,28 +1,81 @@
 import { useState } from "react";
-import { ArrowRight, ArrowLeft, Clapperboard, FileText, Image, Play, CheckCircle2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, FileText, Image, Play, CheckCircle2, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { api } from "@/lib/api";
 
 // Simple stepper for creating a project
-export function CreateProjectWizard({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
+export function CreateProjectWizard({
+  open,
+  onOpenChange,
+  product,
+  scripts = [],
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  product?: any;
+  scripts?: any[];
+  onCreated?: (project: any) => void;
+}) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const [selectedScript, setSelectedScript] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleNext = () => setStep((s) => Math.min(s + 1, 3) as 1 | 2 | 3);
   const handlePrev = () => setStep((s) => Math.max(s - 1, 1) as 1 | 2 | 3);
 
-  const handleGenerate = () => {
-    // Mock generation start
-    onOpenChange(false);
+  const reset = () => {
     setStep(1);
     setSelectedAsset(null);
     setSelectedScript(null);
   };
 
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const project = (await api.createProject({
+        productId: product?.id || null,
+        product: product?.brand || product?.name || "",
+        name: product ? `${product.name} 短视频项目` : "新建视频项目",
+        ratio: "9:16",
+        status: "排队中",
+        progress: 0,
+        visibility: "Private",
+      })) as any;
+      await api.createJob({
+        projectId: project.id,
+        name: `${project.name} 生成任务`,
+        project: project.name,
+        stage: "等待中",
+        progress: 0,
+        status: "等待中",
+        type: "generating",
+        trace: [`已选择素材：${selectedAsset || "未选择"}`, `已选择脚本：${selectedScript || "未选择"}`],
+      });
+      onCreated?.(project);
+      onOpenChange(false);
+      reset();
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const scriptOptions = scripts.length
+    ? scripts.map((script) => ({
+        id: script.id,
+        label: script.versionLabel,
+        desc: `${script.content?.length || 0} 个分镜 · ${script.note || "AI 脚本"}`,
+      }))
+    : [
+        { id: "v1 初版脚本 (侧重功能介绍)", label: "v1 初版脚本 (侧重功能介绍)", desc: "包含 5 个分镜 · 预计时长 25 秒" },
+        { id: "v2 修改版 (侧重痛点开场)", label: "v2 修改版 (侧重痛点开场)", desc: "包含 5 个分镜 · 预计时长 25 秒" },
+      ];
+
   return (
     <Dialog open={open} onOpenChange={(val) => {
       onOpenChange(val);
-      if (!val) { setTimeout(() => setStep(1), 200); }
+      if (!val) { setTimeout(reset, 200); }
     }}>
       <DialogContent className="sm:max-w-[700px] gap-0 p-0 overflow-hidden bg-white">
         
@@ -85,20 +138,20 @@ export function CreateProjectWizard({ open, onOpenChange }: { open: boolean, onO
             <div className="animate-fade-in flex flex-col gap-6">
               <p className="text-sm text-neutral-500">选择基于 AI 生成的视频分镜脚本。不同的脚本侧重不同的转化目标。</p>
               <div className="grid gap-4">
-                {['v1 初版脚本 (侧重功能介绍)', 'v2 修改版 (侧重痛点开场)'].map((script) => (
+                {scriptOptions.map((script) => (
                   <button 
-                    key={script} 
-                    onClick={() => setSelectedScript(script)}
+                    key={script.id} 
+                    onClick={() => setSelectedScript(script.label)}
                     className={`
                       flex items-center justify-between p-5 rounded-xl border-2 text-left transition-all
-                      ${selectedScript === script ? 'border-blue-500 bg-blue-50' : 'border-neutral-100 hover:border-blue-200'}
+                      ${selectedScript === script.label ? 'border-blue-500 bg-blue-50' : 'border-neutral-100 hover:border-blue-200'}
                     `}
                   >
                     <div className="flex items-center gap-4">
-                      <FileText className={selectedScript === script ? 'text-blue-500' : 'text-neutral-400'} size={24} />
+                      <FileText className={selectedScript === script.label ? 'text-blue-500' : 'text-neutral-400'} size={24} />
                       <div>
-                        <p className="font-bold text-neutral-900">{script}</p>
-                        <p className="text-sm text-neutral-500 mt-1">包含 5 个分镜 · 预计时长 25 秒</p>
+                        <p className="font-bold text-neutral-900">{script.label}</p>
+                        <p className="text-sm text-neutral-500 mt-1">{script.desc}</p>
                       </div>
                     </div>
                   </button>
@@ -160,8 +213,13 @@ export function CreateProjectWizard({ open, onOpenChange }: { open: boolean, onO
               下一步 <ArrowRight size={16} />
             </button>
           ) : (
-            <button onClick={handleGenerate} className="btn-primary bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-emerald-600/20 shadow-lg">
-              <Play size={16} className="fill-current" /> 开始生成视频
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="btn-primary bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-emerald-600/20 shadow-lg"
+            >
+              {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} className="fill-current" />}
+              开始生成视频
             </button>
           )}
         </div>

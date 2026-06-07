@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { api } from "@/lib/api";
 
 type AssetType = "image" | "video" | "audio";
 interface Asset {
@@ -18,11 +19,12 @@ interface Asset {
   isGenerating?: boolean;
 }
 
-export function AddProductDialog() {
+export function AddProductDialog({ onCreated }: { onCreated?: (product: any) => void }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -82,6 +84,31 @@ export function AddProductDialog() {
       setTimeout(() => setStep(1), 200);
     }
   }
+
+  const handleCreateProduct = async () => {
+    if (!formData.name || !formData.brand || !formData.category) return;
+    setIsSaving(true);
+    try {
+      const mainAsset = assets.find((asset) => asset.id === mainImageId);
+      const product = await api.createProduct({
+        name: formData.name,
+        brand: formData.brand,
+        category: formData.category,
+        description: formData.details,
+        mainImage: mainAsset?.url || "",
+        assetCount: assets.length,
+        scriptCount: 0,
+        projectCount: 0,
+      });
+      onCreated?.(product);
+      setOpen(false);
+      setStep(1);
+      setFormData({ name: "", brand: "", details: "", category: "" });
+      setUrl("");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -343,7 +370,12 @@ export function AddProductDialog() {
               下一步，管理素材
             </button>
           ) : (
-            <button onClick={() => setOpen(false)} className="btn-primary bg-emerald-600 hover:bg-emerald-700 border-emerald-600 whitespace-nowrap shrink-0">
+            <button
+              onClick={handleCreateProduct}
+              disabled={isSaving || !formData.name || !formData.brand || !formData.category}
+              className="btn-primary bg-emerald-600 hover:bg-emerald-700 border-emerald-600 whitespace-nowrap shrink-0"
+            >
+              {isSaving ? <Loader2 size={16} className="animate-spin" /> : null}
               确认添加商品
             </button>
           )}
