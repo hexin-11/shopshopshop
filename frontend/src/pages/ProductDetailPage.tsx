@@ -42,6 +42,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ResponsiveContainer, AreaChart, Area, Tooltip } from "recharts";
 
 type Tab = "dashboard" | "assets" | "scripts";
 
@@ -95,75 +102,45 @@ const PlatformIcon = ({ platform }: { platform: string }) => {
 };
 
 const InteractiveLineChart = ({ platform, idx }: { platform: any, idx: number }) => {
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const chartData = platform.series.map((val: number, i: number) => ({
+    name: `Day ${i + 1}`,
+    value: val,
+  }));
 
   return (
-    <div className="relative h-16 w-full" onMouseLeave={() => setHoveredIdx(null)}>
-      <svg viewBox="0 0 240 64" className="w-full h-full overflow-visible" preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <linearGradient id={`grad-product-${idx}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={platform.color} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={platform.color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        
-        {hoveredIdx !== null && (
-          <line 
-            x1={hoveredIdx * 40} y1={0} 
-            x2={hoveredIdx * 40} y2={64} 
-            stroke={platform.color} strokeWidth="1" strokeDasharray="3 3" 
-            opacity="0.3" 
+    <div className="h-16 w-full relative">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+          <defs>
+            <linearGradient id={`grad-product-${idx}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={platform.color} stopOpacity={0.3}/>
+              <stop offset="95%" stopColor={platform.color} stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <Tooltip
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                return (
+                  <div className="bg-neutral-900 text-white text-[12px] px-2 py-0.5 rounded shadow-md font-mono border border-neutral-800">
+                    {payload[0].value}
+                  </div>
+                );
+              }
+              return null;
+            }}
           />
-        )}
-
-        <polygon
-          points={[
-            ...platform.series.map((v: number, i: number) => `${i * 40},${64 - v * 0.64}`),
-            `${(platform.series.length - 1) * 40},64`,
-            "0,64",
-          ].join(" ")}
-          fill={`url(#grad-product-${idx})`}
-        />
-        
-        <polyline
-          points={platform.series.map((v: number, i: number) => `${i * 40},${64 - v * 0.64}`).join(" ")}
-          fill="none"
-          stroke={platform.color}
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        
-        {platform.series.map((v: number, i: number) => (
-          <g key={i} onMouseEnter={() => setHoveredIdx(i)} className="cursor-pointer">
-            <circle cx={i * 40} cy={64 - v * 0.64} r="12" fill="transparent" />
-            <circle
-              cx={i * 40}
-              cy={64 - v * 0.64}
-              r={hoveredIdx === i ? "6" : "4"}
-              fill="#FFFFFF"
-              stroke={platform.color}
-              strokeWidth={hoveredIdx === i ? "3" : "2"}
-              className="transition-all duration-200"
-            />
-          </g>
-        ))}
-
-        {hoveredIdx !== null && (
-          <text
-            x={hoveredIdx * 40}
-            y={64 - platform.series[hoveredIdx] * 0.64 - 12}
-            textAnchor="middle"
-            fill={platform.color}
-            className="text-[12px] font-bold pointer-events-none drop-shadow-md"
-            style={{ textShadow: '0px 2px 4px rgba(0,0,0,0.1)' }}
-          >
-            {platform.series[hoveredIdx]}
-          </text>
-        )}
-      </svg>
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={platform.color}
+            strokeWidth={2.5}
+            fillOpacity={1}
+            fill={`url(#grad-product-${idx})`}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
-  )
+  );
 }
 
 interface ProductDetailPageProps {
@@ -204,6 +181,75 @@ export default function ProductDetailPage({
   const [isGenerating, setIsGenerating] = useState(false);
   const [localScript, setLocalScript] = useState<any | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // --- Storyboard Asset Binding State ---
+  const [bindingShotIndex, setBindingShotIndex] = useState<number | null>(null);
+
+  // --- Asset Upload Simulator ---
+  const handleUploadAsset = () => {
+    const assetTypes = ["商品图片", "商品视频", "生活方式图", "参考视频", "音频 / BGM"];
+    const randomType = assetTypes[Math.floor(Math.random() * assetTypes.length)];
+    
+    let randomName = "";
+    const randId = Math.floor(Math.random() * 1000);
+    if (randomType === "商品图片") {
+      randomName = `新商品图_${randId}.jpg`;
+    } else if (randomType === "商品视频") {
+      randomName = `细节特写视频_${randId}.mp4`;
+    } else if (randomType === "生活方式图") {
+      randomName = `生活场景图_${randId}.jpg`;
+    } else if (randomType === "参考视频") {
+      randomName = `开箱参考_${randId}.mp4`;
+    } else {
+      randomName = `背景配乐_${randId}.wav`;
+    }
+
+    const newAsset = {
+      name: randomName,
+      type: randomType,
+      tags: ["新上传", randomType.split(" / ")[0]],
+      owner: "何鑫",
+      used: 0,
+      color: "from-blue-100 to-indigo-100",
+    };
+
+    setLocalAssets(prev => [newAsset, ...prev]);
+  };
+
+  // --- Save Script Version ---
+  const handleSaveScriptVersion = () => {
+    if (!localScript) return;
+    
+    const nextVerNum = scripts.length + 1;
+    const nextVersionLabel = `v${nextVerNum} 自定义修改版本`;
+    
+    const newVersion = {
+      id: `script-${productId}-${Date.now()}`,
+      versionLabel: nextVersionLabel,
+      content: [...localScript.content],
+      note: `用户保存于 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 的新版本`,
+      author: "何鑫",
+      time: "刚刚",
+    };
+    
+    const updatedScripts = [...scripts, newVersion];
+    setScripts(updatedScripts);
+    
+    setLocalProduct((prev: any) => ({
+      ...prev,
+      scriptCount: updatedScripts.length
+    }));
+    setProduct((prev: any) => ({
+      ...prev,
+      scriptCount: updatedScripts.length
+    }));
+    
+    setLocalScript({
+      ...localScript,
+      versionLabel: nextVersionLabel
+    });
+    setSelectedScriptId(newVersion.id);
+  };
 
   useEffect(() => {
     const defaultProduct = catalog.find((p) => p.id === productId) ?? catalog[0];
@@ -446,19 +492,40 @@ export default function ProductDetailPage({
                   className="flex flex-col gap-8"
                 >
                   {/* KPI 指标 */}
-                  <div className="grid grid-cols-2 gap-6">
-                    {dashboardMetrics.map((metric) => (
-                      <div key={metric.label} className="p-6 rounded-xl border border-neutral-100 bg-neutral-50/50">
-                        <p className="text-sm font-medium text-neutral-500 mb-2">{metric.label}</p>
-                        <div className="flex items-end justify-between">
-                          <span className="text-3xl font-extrabold text-neutral-900">{metric.value}</span>
-                          <span className={`text-sm font-bold ${metric.delta.startsWith('+') ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {metric.delta}
-                          </span>
-                        </div>
+                  {(() => {
+                    const isEarphone = localProduct.id === "prod-earphone";
+                    const isSerum = localProduct.id === "prod-serum";
+                    const isBottle = localProduct.id === "prod-bottle";
+                    
+                    const totalViews = isEarphone ? "128.4K" : isSerum ? "88.6K" : isBottle ? "52.1K" : "32.0K";
+                    const totalViewsDelta = isEarphone ? "+15.2%" : isSerum ? "+8.4%" : isBottle ? "+12.1%" : "+4.8%";
+                    
+                    const estROI = isEarphone ? "3.6x" : isSerum ? "2.8x" : isBottle ? "2.4x" : "1.8x";
+                    const estROIDelta = isEarphone ? "+0.4" : isSerum ? "+0.2" : isBottle ? "+0.1" : "+0.0";
+
+                    const productMetrics = [
+                      { label: "关联项目数", value: `${localProduct.projectCount ?? 0} 个`, delta: "+1" },
+                      { label: "已发布视频数", value: `${Math.max(0, (localProduct.projectCount ?? 0) - 1)} 个`, delta: "+1" },
+                      { label: "单品全网总播放量", value: totalViews, delta: totalViewsDelta },
+                      { label: "预估 ROI", value: estROI, delta: estROIDelta }
+                    ];
+
+                    return (
+                      <div className="grid grid-cols-2 gap-6">
+                        {productMetrics.map((metric) => (
+                          <div key={metric.label} className="p-6 rounded-xl border border-neutral-100 bg-neutral-50/50">
+                            <p className="text-sm font-medium text-neutral-500 mb-2">{metric.label}</p>
+                            <div className="flex items-end justify-between">
+                              <span className="text-3xl font-extrabold text-neutral-900">{metric.value}</span>
+                              <span className={`text-sm font-bold ${metric.delta.startsWith('+') ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {metric.delta}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
 
                   {/* 全网分发表现 */}
                   <div className="mt-4 border border-neutral-100 rounded-2xl shadow-sm">
@@ -543,7 +610,7 @@ export default function ProductDetailPage({
                         </button>
                       ))}
                     </div>
-                    <button className="btn-primary shrink-0">
+                    <button onClick={handleUploadAsset} className="btn-primary shrink-0">
                       <Plus size={16} /> 上传新素材
                     </button>
                   </div>
@@ -777,7 +844,13 @@ export default function ProductDetailPage({
                             {localScript ? localScript.versionLabel : '新建草稿'}
                           </h3>
                           <div className="flex gap-2">
-                            <button className="btn-secondary h-8 px-3 text-xs shrink-0"><Save size={14} /> 保存为新版本</button>
+                            <button 
+                              onClick={handleSaveScriptVersion} 
+                              disabled={!localScript} 
+                              className="btn-secondary h-8 px-3 text-xs shrink-0 disabled:opacity-50"
+                            >
+                              <Save size={14} /> 保存为新版本
+                            </button>
                             <button onClick={() => setIsWizardOpen(true)} disabled={!localScript} className="btn-primary h-8 px-3 text-xs shrink-0 disabled:opacity-50">
                               <Play size={14} /> 从此脚本新建项目
                             </button>
@@ -826,9 +899,28 @@ export default function ProductDetailPage({
                                   className="flex gap-4 group"
                                 >
                                   {/* 关联素材区 */}
-                                  <div className="w-32 h-24 shrink-0 rounded-lg border-2 border-dashed border-neutral-200 bg-neutral-50 flex flex-col items-center justify-center text-neutral-400 cursor-pointer hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors">
-                                    <ImageIcon size={20} className="mb-1" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">指定素材</span>
+                                  <div 
+                                    onClick={() => setBindingShotIndex(index)}
+                                    className="w-32 h-24 shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 flex flex-col items-center justify-center text-neutral-400 cursor-pointer hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all overflow-hidden relative group"
+                                  >
+                                    {shot.boundAsset ? (
+                                      <>
+                                        <div className="absolute inset-0 flex items-center justify-center bg-blue-50/30">
+                                          {getAssetTypeIcon(shot.boundAssetType || "商品图片")}
+                                        </div>
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                          <span className="text-[10px] text-white font-bold bg-blue-600 px-2 py-1 rounded">更换素材</span>
+                                        </div>
+                                        <div className="absolute bottom-0 left-0 right-0 bg-neutral-900/75 py-1 px-1.5 text-center">
+                                          <p className="text-[9px] text-white truncate font-medium">{shot.boundAsset}</p>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ImageIcon size={20} className="mb-1 text-neutral-400 group-hover:text-blue-500" />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 group-hover:text-blue-500">指定素材</span>
+                                      </>
+                                    )}
                                   </div>
                                   
                                   {/* 文本内容编辑器 */}
@@ -890,6 +982,53 @@ export default function ProductDetailPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={bindingShotIndex !== null} onOpenChange={(open) => !open && setBindingShotIndex(null)}>
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col bg-white">
+          <DialogHeader className="border-b border-neutral-100 pb-4">
+            <DialogTitle className="text-lg font-bold text-neutral-900">选择关联素材</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-4 space-y-4">
+            <p className="text-xs text-neutral-500">选择该商品的图片或视频素材，将其绑定到分镜中作为背景参考。</p>
+            <div className="grid grid-cols-3 gap-3">
+              {localAssets.filter(a => getAssetCategory(a.type) === "image" || getAssetCategory(a.type) === "video").map((asset) => {
+                const isSelected = localScript?.content[bindingShotIndex!]?.boundAsset === asset.name;
+                return (
+                  <div
+                    key={asset.name}
+                    onClick={() => {
+                      if (localScript && bindingShotIndex !== null) {
+                        const newScript = { ...localScript };
+                        if (!newScript.content[bindingShotIndex]) return;
+                        newScript.content[bindingShotIndex].boundAsset = asset.name;
+                        newScript.content[bindingShotIndex].boundAssetType = asset.type;
+                        setLocalScript(newScript);
+                        setBindingShotIndex(null);
+                      }
+                    }}
+                    className={`p-3 rounded-lg border-2 text-left cursor-pointer transition-all flex flex-col items-center gap-2 hover:border-blue-400
+                      ${isSelected ? 'border-blue-500 bg-blue-50/20' : 'border-neutral-100 bg-white'}
+                    `}
+                  >
+                    <div className="w-full h-20 bg-neutral-50 rounded flex items-center justify-center text-neutral-300">
+                      {getAssetTypeIcon(asset.type)}
+                    </div>
+                    <span className="text-[11px] font-bold text-neutral-800 truncate w-full text-center">{asset.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {localAssets.filter(a => getAssetCategory(a.type) === "image" || getAssetCategory(a.type) === "video").length === 0 && (
+              <div className="text-center py-8 text-neutral-400 text-sm">
+                当前产品暂无可用的图片或视频素材，请先上传素材。
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-3 border-t border-neutral-100 pt-4">
+            <button onClick={() => setBindingShotIndex(null)} className="btn-ghost px-5">取消</button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
