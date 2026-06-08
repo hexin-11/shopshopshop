@@ -1,16 +1,9 @@
 import {
   ArrowLeft,
   Clapperboard,
-  FileText,
   Image as ImageIcon,
-  Lock,
   Package,
-  Play,
   Plus,
-  RefreshCw,
-  Save,
-  Send,
-  Share2,
   Zap,
   Users,
   CheckCircle2,
@@ -21,16 +14,12 @@ import {
   Camera,
   Film,
   FolderOpen,
-  Bot,
-  User,
-  Loader2,
   BarChart2
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { assets as mockAssets, catalog, productScripts, dashboardMetrics, platformPerformance } from "../data/mockData";
+import { assets as mockAssets, catalog, platformPerformance } from "../data/mockData";
 import { api } from "../lib/api";
-import { CreateProjectWizard } from "../components/project/CreateProjectWizard";
 import { EditProductDialog } from "../components/product/EditProductDialog";
 import {
   AlertDialog,
@@ -42,15 +31,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from "recharts";
 
-type Tab = "dashboard" | "assets" | "scripts";
+type Tab = "dashboard" | "assets";
 
 interface ChatMessage {
   id: string;
@@ -154,13 +137,10 @@ export default function ProductDetailPage({
   productId,
   onBack,
   openProject,
-  onQuickGenerate,
 }: ProductDetailPageProps) {
   const [tab, setTab] = useState<Tab>("dashboard");
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [product, setProduct] = useState<any>(catalog.find((p) => p.id === productId) ?? catalog[0]);
-  const [assetList, setAssetList] = useState<any[]>(mockAssets);
-  const [scripts, setScripts] = useState<any[]>(productScripts[productId] ?? []);
+  const [localAssets, setLocalAssets] = useState<any[]>(mockAssets);
 
   // --- Product State ---
   const [localProduct, setLocalProduct] = useState<any>(
@@ -169,23 +149,28 @@ export default function ProductDetailPage({
 
   // --- Asset Library State ---
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
-  const [localAssets, setLocalAssets] = useState<any[]>(mockAssets);
-  const [mainImageId, setMainImageId] = useState<string>("产品正面主图_4K.jpg"); // Mock default
+  const [mainImageId, setMainImageId] = useState<string>("产品正面主图_4K.jpg");
   const [activeCategory, setActiveCategory] = useState<"all" | "image" | "video" | "audio">("all");
   const [assetToSetMain, setAssetToSetMain] = useState<string | null>(null);
 
-  // --- AI Copilot State ---
-  const [selectedScriptId, setSelectedScriptId] = useState<string | "new" | null>(null);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [localScript, setLocalScript] = useState<any | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const defaultProduct = catalog.find((p) => p.id === productId) ?? catalog[0];
+    setProduct(defaultProduct);
+    setLocalProduct(defaultProduct);
+    setLocalAssets(mockAssets);
 
-  // --- Storyboard Asset Binding State ---
-  const [bindingShotIndex, setBindingShotIndex] = useState<number | null>(null);
+    api.product(productId).then((p) => {
+      setProduct(p);
+      setLocalProduct(p);
+    });
+    api.productAssets(productId).then((items) => {
+      setLocalAssets(items as any[]);
+    });
+  }, [productId]);
 
-  // --- Asset Upload Simulator ---
+  const filteredAssets = localAssets.filter(asset =>
+    activeCategory === "all" || getAssetCategory(asset.type) === activeCategory
+  );
   const handleUploadAsset = () => {
     const assetTypes = ["商品图片", "商品视频", "生活方式图", "参考视频", "音频 / BGM"];
     const randomType = assetTypes[Math.floor(Math.random() * assetTypes.length)];
@@ -207,75 +192,7 @@ export default function ProductDetailPage({
     const newAsset = {
       name: randomName,
       type: randomType,
-      tags: ["新上传", randomType.split(" / ")[0]],
-      owner: "何鑫",
-      used: 0,
-      color: "from-blue-100 to-indigo-100",
-    };
-
-    setLocalAssets(prev => [newAsset, ...prev]);
-  };
-
-  // --- Save Script Version ---
-  const handleSaveScriptVersion = () => {
-    if (!localScript) return;
-    
-    const nextVerNum = scripts.length + 1;
-    const nextVersionLabel = `v${nextVerNum} 自定义修改版本`;
-    
-    const newVersion = {
-      id: `script-${productId}-${Date.now()}`,
-      versionLabel: nextVersionLabel,
-      content: [...localScript.content],
-      note: `用户保存于 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 的新版本`,
-      author: "何鑫",
-      time: "刚刚",
-    };
-    
-    const updatedScripts = [...scripts, newVersion];
-    setScripts(updatedScripts);
-    
-    setLocalProduct((prev: any) => ({
-      ...prev,
-      scriptCount: updatedScripts.length
-    }));
-    setProduct((prev: any) => ({
-      ...prev,
-      scriptCount: updatedScripts.length
-    }));
-    
-    setLocalScript({
-      ...localScript,
-      versionLabel: nextVersionLabel
-    });
-    setSelectedScriptId(newVersion.id);
-  };
-
-  useEffect(() => {
-    const defaultProduct = catalog.find((p) => p.id === productId) ?? catalog[0];
-    setProduct(defaultProduct);
-    setLocalProduct(defaultProduct);
-    setAssetList(mockAssets);
-    setLocalAssets(mockAssets);
-    setScripts(productScripts[productId] ?? []);
-
-    api.product(productId).then((p) => {
-      setProduct(p);
-      setLocalProduct(p);
-    });
-    api.productAssets(productId).then((items) => {
-      setAssetList(items as any[]);
-      setLocalAssets(items as any[]);
-    });
-    api.productScripts(productId).then((items) => {
-      setScripts(items as any[]);
-    });
-  }, [productId]);
-
-  const filteredAssets = localAssets.filter(asset => 
-    activeCategory === "all" || getAssetCategory(asset.type) === activeCategory
-  );
-
+      tags: ["新�
   // Asset Methods
   const toggleAsset = (assetName: string) => {
     const newSet = new Set(selectedAssets);
@@ -306,50 +223,12 @@ export default function ProductDetailPage({
     }
   };
 
-  const handleCreateScriptFromAssets = () => {
-    setTab("scripts");
-    handleGenerateNewScript();
-  };
+  const tabs = [
+    { key: "dashboard", label: "效果概览", icon: BarChart2 },
+    { key: "assets",    label: "项目素材库", icon: ImageIcon },
+  ] as const;
 
-  // Copilot Methods
-  const handleGenerateNewScript = () => {
-    setSelectedScriptId("new");
-    setLocalScript(null);
-    setChatHistory([
-      { id: Date.now().toString(), role: "ai", content: `您好！我是您的脚本助手。请问您想为《${localProduct.name}》制作什么风格的视频？（例如：TikTok 节奏开箱、专业功能讲解、唯美氛围感种草等）` }
-    ]);
-  };
-
-  const handleSelectExistingScript = (s: any) => {
-    setSelectedScriptId(s.id);
-    setLocalScript(JSON.parse(JSON.stringify(s))); // Deep copy for local edits
-    setChatHistory([
-      { id: Date.now().toString(), role: "ai", content: `我已经为您加载了版本《${s.versionLabel}》。您可以直接在右侧手动修改文案，或者告诉我您想要怎么调整，例如：“帮我给第三个镜头加点悬念”。` }
-    ]);
-  };
-
-  const handleSendMessage = () => {
-    if (!chatInput.trim()) return;
-    
-    const userMsg: ChatMessage = { id: Date.now().toString(), role: "user", content: chatInput };
-    setChatHistory(prev => [...prev, userMsg]);
-    setChatInput("");
-    setIsGenerating(true);
-
-    // Simulate AI generation/modification delay
-    setTimeout(() => {
-      const aiMsg: ChatMessage = { id: Date.now().toString(), role: "ai", content: "明白！我已经为您更新了剧本，请在右侧查阅。您觉得这个方向可以吗？" };
-      setChatHistory(prev => [...prev, aiMsg]);
-      setIsGenerating(false);
-
-      if (!localScript) {
-        // Generating new mock script
-        setLocalScript({
-          versionLabel: "新生成草稿",
-          content: [
-            { heading: "前三秒黄金抓手", body: "这绝对是你今年见过最惊艳的数码好物！（展示产品核心亮点）" },
-            { heading: "痛点引入", body: "以前总觉得桌面上乱糟糟的，线头到处都是..." },
-            { heading: "功能展示", body: "直到我遇到了它！磁吸设计，一秒归位，强迫症福音。" },
+症福音。" },
             { heading: "转化引导", body: "现在点击左下角，还有专属粉丝福利哦！" },
           ]
         });
@@ -372,8 +251,14 @@ export default function ProductDetailPage({
   const tabs = [
     { key: "dashboard", label: "效果概览", icon: BarChart2 },
     { key: "assets",    label: "项目素材库", icon: ImageIcon },
-    { key: "scripts",   label: "AI 脚本",    icon: FileText },
   ] as const;
+
+  // Dispatch AI creation event with productId
+  const handleCreateVideo = () => {
+    window.dispatchEvent(
+      new CustomEvent("shopclip:openVideoCreation", { detail: { productId: localProduct.id } })
+    );
+  };
 
   return (
     <div className="flex flex-col gap-8 animate-fade-in max-w-7xl mx-auto pb-24">
@@ -408,9 +293,9 @@ export default function ProductDetailPage({
           </div>
         </div>
 
-        <button onClick={() => setIsWizardOpen(true)} className="btn-primary shrink-0 shadow-sm">
+        <button onClick={handleCreateVideo} className="btn-primary shrink-0 shadow-sm">
           <Zap size={18} />
-          新建视频项目
+          AI 创作视频
         </button>
       </div>
 

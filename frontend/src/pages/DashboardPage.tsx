@@ -57,10 +57,12 @@ export default function DashboardPage({
           <p className="mt-2 text-[16px] text-[#171719]/60">一站式管理视频内容分发、生产进度与商品库。</p>
         </div>
         <button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent("shopclip:openVideoCreation", { detail: { productId: "" } }));
+          }}
           className="btn-primary flex items-center gap-2 px-5 py-3 rounded-xl shadow-[0_4px_12px_rgba(70,132,238,0.15)] hover:shadow-[0_6px_16px_rgba(70,132,238,0.25)] transition-all shrink-0"
         >
-          <Zap size={18} /> 一键制作视频
+          <Zap size={18} /> AI 创作视频
         </button>
       </div>
 
