@@ -1,0 +1,1832 @@
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clapperboard,
+  Download,
+  FileText,
+  Film,
+  Image,
+  ImagePlus,
+  Loader2,
+  MoreHorizontal,
+  Paperclip,
+  Pencil,
+  Pin,
+  PinOff,
+  Play,
+  Plus,
+  RefreshCw,
+  Scissors,
+  Send,
+  Sparkles,
+  Trash2,
+  Wand2,
+  Wrench,
+  X,
+  Zap,
+} from "lucide-react";
+import { api } from "../lib/api";
+import { catalog } from "../data/mockData";
+
+// ── Existing types ────────────────────────────────────────────────────────────
+
+interface AgentDockProps {
+  children: ReactNode;
+}
+
+type ChatMessage = {
+  id: number | string;
+  role: "user" | "agent";
+  text: string;
+  thinking?: string[];
+  changes?: AgentChange[];
+};
+type AgentChange = {
+  type: string;
+  target: string;
+  summary: string;
+  newText?: string;
+  status?: string;
+  imageCandidates?: AgentImageCandidate[];
+  videoPlan?: AgentVideoPlan;
+  editActions?: AgentEditAction[];
+};
+type AgentImageCandidate = {
+  id: string;
+  title: string;
+  style?: string;
+  prompt: string;
+  imageUrl: string;
+};
+type AgentVideoPlan = {
+  duration?: number;
+  aspectRatio?: string;
+  motion?: string;
+  prompt?: string;
+  shots?: string[];
+};
+type AgentEditAction = {
+  action: string;
+  target: string;
+  value: string;
+};
+type Conversation = {
+  id: number | string;
+  title: string;
+  updatedAt: string;
+  pinned?: boolean;
+  messages: ChatMessage[];
+  references: string[];
+};
+type LibraryItem = {
+  id: string;
+  type: string;
+  title: string;
+  detail: string;
+};
+
+// ── Video creation types ──────────────────────────────────────────────────────
+
+type VideoCreationStage = "setup" | "outlining" | "canvas" | "generating" | "storyboard" | "preview";
+
+interface VCFormData {
+  productId: string;
+  description: string;
+  videoType: string;
+  style: string;
+  customStyle: string;
+  aspectRatio: string;
+  duration: string;
+  resolution: string;
+  references: string[];
+}
+
+interface StoryBeat {
+  id: string;
+  order: number;
+  heading: string;
+  description: string;
+  duration: number;
+  status: "pending" | "generating" | "done" | "failed";
+  videoClipUrl?: string;
+}
+
+interface VisualRef {
+  id: string;
+  type: "brand" | "character" | "scene" | "custom";
+  label: string;
+  url: string;
+}
+
+interface VideoProjectData {
+  title: string;
+  summary: string;
+  productName: string;
+  videoType: string;
+  style: string;
+  aspectRatio: string;
+  duration: string;
+  resolution: string;
+  storyBeats: StoryBeat[];
+  visualRefs: VisualRef[];
+}
+
+interface VCSession {
+  id: string;
+  conversationId: number | string;
+  title: string;
+  videoType: string;
+  stage: VideoCreationStage;
+  thumbnail?: string;
+  createdAt: string;
+  project?: VideoProjectData;
+  form: VCFormData;
+}
+
+// ── Existing constants ────────────────────────────────────────────────────────
+
+const agentHistoryFlag = "tikframe-agent";
+const STORAGE_KEY = "tikframe-agent-conversations";
+
+const libraryItems: LibraryItem[] = [
+  { id: "earphone", type: "商品", title: "Havit H630BT 主动降噪耳机", detail: "含主图、卖点、短视频脚本和 2 个项目。" },
+  { id: "script-hook", type: "脚本", title: "开场三秒强钩子模板", detail: "适合数码、美妆、家居类商品，可直接生成分镜。" },
+  { id: "project-618", type: "项目", title: "618 爆品短视频队列", detail: "包含待审核项目、生成中任务和历史导出记录。" },
+  { id: "cover", type: "素材", title: "竖版封面标题模板", detail: "适合 9:16 带货视频封面，留有商品与标题空间。" },
+];
+
+const quickActions = [
+  { label: "商品卖点", prompt: "帮我把当前商品整理成 5 个带货卖点", reply: "已整理卖点框架：痛点开场、核心参数、使用场景、对比优势、下单理由。你可以继续让我生成短视频脚本。", icon: FileText },
+  { label: "素材检查", prompt: "检查当前素材是否适合生成短视频", reply: "素材检查完成：主图清晰度可用，建议补 2 张使用场景图，并把字幕卖点控制在 12 字以内。", icon: Image },
+  { label: "文生图", prompt: "帮我生成 3 张适合短视频开场的商品图片候选，先问清楚风格也可以", reply: "我会先确认商品和视觉风格，再给你 3 张候选图，选中后可以继续图生视频。", icon: Sparkles },
+  { label: "图生视频", prompt: "用我选中的图片生成一个 6 秒图生视频方案，包含运镜、字幕和节奏", reply: "我会把选中的图片转成视频任务方案，并拆出运镜、字幕和镜头节奏。", icon: Film },
+  { label: "项目推进", prompt: "把当前脚本推进到视频生成队列", reply: "已把当前工作流整理为生成任务：脚本、素材、口播和封面都进入待处理清单。你可以从项目页继续查看。", icon: Clapperboard },
+];
+
+const firstConversation: Conversation = {
+  id: 1,
+  title: "TikFrame AI 创作助手",
+  updatedAt: "今天",
+  references: [],
+  messages: [{ id: 1, role: "agent", text: "我可以帮你找商品、改脚本、检查素材，或者把项目推进到生成队列。" }],
+};
+
+const VIDEO_TYPES = [
+  { id: "influencer", label: "口播带货" },
+  { id: "product", label: "商品展示" },
+  { id: "unboxing", label: "开箱评测" },
+  { id: "skit", label: "情景剧带货" },
+  { id: "comparison", label: "对比测评" },
+];
+
+const STYLE_PRESETS = [
+  { id: "luxury", label: "高端质感" },
+  { id: "lively", label: "轻快活泼" },
+  { id: "cinematic", label: "电影感" },
+  { id: "guochao", label: "国潮" },
+  { id: "fresh", label: "清新" },
+];
+
+const ASPECT_RATIOS = [
+  { id: "9:16", label: "9:16 竖版" },
+  { id: "16:9", label: "16:9 横版" },
+  { id: "1:1", label: "1:1 方形" },
+];
+
+const DURATIONS_MAP = [
+  { id: "15", label: "~15s" },
+  { id: "30", label: "~30s" },
+  { id: "60", label: "~60s" },
+];
+
+const RESOLUTIONS_MAP = [
+  { id: "720p", label: "720p" },
+  { id: "1080p", label: "1080p" },
+  { id: "2k", label: "2K" },
+];
+
+const defaultVCForm: VCFormData = {
+  productId: "",
+  description: "",
+  videoType: "influencer",
+  style: "luxury",
+  customStyle: "",
+  aspectRatio: "9:16",
+  duration: "30",
+  resolution: "1080p",
+  references: [],
+};
+
+function getStoryBeats(videoType: string): StoryBeat[] {
+  const presets: Record<string, StoryBeat[]> = {
+    influencer: [
+      { id: "b1", order: 1, heading: "开场钩子", description: "主播出镜，3 秒内抛出核心痛点问题，画面冲击感强，抓住目标用户停留", duration: 5, status: "pending" },
+      { id: "b2", order: 2, heading: "产品亮相", description: "产品特写镜头，展示外观质感，字幕同步核心关键词，运镜流畅自然", duration: 6, status: "pending" },
+      { id: "b3", order: 3, heading: "核心卖点", description: "口播 2-3 个差异化卖点，配合功能演示画面，节奏明快，信息密度适中", duration: 8, status: "pending" },
+      { id: "b4", order: 4, heading: "使用场景", description: "真实生活场景中使用产品，强化代入感与信任感，背景自然", duration: 6, status: "pending" },
+      { id: "b5", order: 5, heading: "下单引导", description: "价格+限时优惠+行动指令，引导点击购买，氛围制造紧迫感", duration: 5, status: "pending" },
+    ],
+    product: [
+      { id: "b1", order: 1, heading: "产品全貌", description: "360° 产品外观展示，背景简洁干净，光线均匀充足，突出品质感", duration: 4, status: "pending" },
+      { id: "b2", order: 2, heading: "细节特写", description: "材质工艺细节及关键功能区域特写，展示产品用心之处", duration: 6, status: "pending" },
+      { id: "b3", order: 3, heading: "使用演示", description: "产品实际使用过程，展示操作简便性与功效，真实自然", duration: 8, status: "pending" },
+      { id: "b4", order: 4, heading: "效果展示", description: "使用效果直观呈现，或使用前后对比，强化说服力", duration: 7, status: "pending" },
+      { id: "b5", order: 5, heading: "品牌收尾", description: "品牌标语+产品定格，留下视觉印象，引导关注或下单", duration: 5, status: "pending" },
+    ],
+    unboxing: [
+      { id: "b1", order: 1, heading: "包装期待", description: "产品包装整体展示，制造好奇心与期待感，光线均匀", duration: 4, status: "pending" },
+      { id: "b2", order: 2, heading: "拆箱过程", description: "真实自然的开箱，保留第一反应和声音，增强真实感和代入感", duration: 8, status: "pending" },
+      { id: "b3", order: 3, heading: "内容物展示", description: "配件、说明书、产品本体逐一展示，完整呈现盒内所有内容", duration: 6, status: "pending" },
+      { id: "b4", order: 4, heading: "第一印象", description: "初次上手体验，真实感受与表情反馈，增强可信度", duration: 7, status: "pending" },
+      { id: "b5", order: 5, heading: "总结推荐", description: "优缺点总结，给出明确的是否推荐购买建议", duration: 5, status: "pending" },
+    ],
+    skit: [
+      { id: "b1", order: 1, heading: "生活困扰", description: "真实用户遇到痛点问题的生活场景，引发强烈共鸣，表演自然", duration: 5, status: "pending" },
+      { id: "b2", order: 2, heading: "冲突升级", description: "问题带来的麻烦变得严重，用户焦虑情绪外显，节奏紧张", duration: 4, status: "pending" },
+      { id: "b3", order: 3, heading: "产品救场", description: "产品作为解决方案自然登场，情节转折自然不生硬", duration: 4, status: "pending" },
+      { id: "b4", order: 4, heading: "问题消解", description: "使用产品后困扰消失，展示明显改变与轻松感，对比明显", duration: 6, status: "pending" },
+      { id: "b5", order: 5, heading: "美好结局", description: "用户满意状态定格，叠加产品信息与购买引导，情感收尾", duration: 5, status: "pending" },
+    ],
+    comparison: [
+      { id: "b1", order: 1, heading: "选择困扰", description: "市场同类产品让人纠结，引出对比需求，引起共鸣", duration: 4, status: "pending" },
+      { id: "b2", order: 2, heading: "竞品回顾", description: "同类竞品的外观和主要功能简要介绍，客观中立", duration: 5, status: "pending" },
+      { id: "b3", order: 3, heading: "核心优势", description: "本品在关键维度的优势对比，数据化直观呈现，可信度高", duration: 8, status: "pending" },
+      { id: "b4", order: 4, heading: "实测背书", description: "关键指标实测，客观数据增强可信度，镜头真实", duration: 7, status: "pending" },
+      { id: "b5", order: 5, heading: "明确推荐", description: "总结对比，给出明确推荐结论，引导下单，CTA 清晰", duration: 6, status: "pending" },
+    ],
+  };
+  return (presets[videoType] || presets["product"]).map((b) => ({ ...b }));
+}
+
+const summaryMap: Record<string, string> = {
+  influencer: "一条面向目标用户的口播带货视频。通过主播真实演绎，建立信任感，突出产品核心差异点，以紧凑节奏完成从痛点引共鸣到促成下单的完整转化链路。",
+  product: "以产品为主角的纯展示视频。从全貌到细节，通过精致的运镜和光影展示产品质感，让观众感受产品的品质与用心，建立品牌形象。",
+  unboxing: "一条真实自然的开箱评测视频。保留第一次上手的真实感受，完整展示包装、配件和产品本体，给有购买意向的用户提供参考。",
+  skit: "以生活情景剧方式带入的带货视频。通过贴近真实的场景和人物，让产品在故事中自然出现，降低销售感，提升观众代入感和分享欲。",
+  comparison: "一条横向对比评测视频。数据化对比关键指标，客观展示产品优势，给正在做购买决策的用户提供有价值的参考。",
+};
+
+const stageLabel: Record<VideoCreationStage, string> = {
+  setup: "设置",
+  outlining: "生成大纲",
+  canvas: "编辑大纲",
+  generating: "生成中",
+  storyboard: "分镜调整",
+  preview: "预览",
+};
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+
+const createConversation = (): Conversation => {
+  const id = Date.now();
+  return { id, title: "新会话", updatedAt: "刚刚", references: [], messages: [] };
+};
+
+const loadConversations = () => {
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (!saved) return [firstConversation];
+    const parsed = JSON.parse(saved) as Conversation[];
+    return parsed.length ? parsed : [firstConversation];
+  } catch {
+    return [firstConversation];
+  }
+};
+
+const normalizeRemoteConversations = (items: unknown[]): Conversation[] =>
+  items
+    .map((item) => item as Partial<Conversation>)
+    .filter((item) => item.id && item.title)
+    .map((item) => ({
+      id: item.id as number | string,
+      title: String(item.title),
+      updatedAt: String(item.updatedAt || "刚刚"),
+      pinned: Boolean(item.pinned),
+      references: Array.isArray(item.references) ? item.references.map(String) : [],
+      messages: Array.isArray(item.messages) ? (item.messages as ChatMessage[]) : [],
+    }));
+
+const makeConversationTitle = (text: string) => {
+  const clean = text.trim().replace(/\s+/g, " ");
+  if (!clean) return "新会话";
+  return clean.length > 16 ? `${clean.slice(0, 16)}...` : clean;
+};
+
+const cleanAgentDisplayText = (text: string) =>
+  text
+    .replace(/(?:Fast|Pro|Deep|Standard)\s*模式已收到。?\s*/g, "")
+    .replace(/我先围绕/g, "我已围绕")
+    .trim();
+
+const getAgentReturnTarget = () => `${window.location.pathname}${window.location.search}`;
+const defaultAgentModel = "Standard";
+
+// ── VCInputBox: expanding chat input ─────────────────────────────────────────
+
+interface VCInputBoxProps {
+  form: VCFormData;
+  onFormChange: (f: VCFormData) => void;
+  onSubmit: () => void;
+  loading: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  expanded: boolean;
+  onExpand: () => void;
+}
+
+function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expanded, onExpand }: VCInputBoxProps) {
+  const [showProductList, setShowProductList] = useState(false);
+  const selectedProduct = catalog.find((p) => p.id === form.productId);
+  const set = (key: keyof VCFormData, value: string) => onFormChange({ ...form, [key]: value });
+
+  return (
+    <div className={`vc-input-box-wrap ${expanded ? "vc-input-expanded" : ""}`}>
+      {/* Main input row (always visible) */}
+      <div className="vc-input-row" onClick={onExpand}>
+        <textarea
+          className="vc-input-textarea"
+          placeholder="描述你的视频..."
+          value={form.description}
+          onChange={(e) => set("description", e.target.value)}
+          onFocus={onExpand}
+          rows={expanded ? 3 : 1}
+        />
+        <button
+          type="button"
+          className="vc-input-send"
+          disabled={loading || !form.description.trim()}
+          onClick={(e) => { e.stopPropagation(); onSubmit(); }}
+          aria-label="生成大纲"
+        >
+          {loading ? <Loader2 size={16} className="vc-spin" /> : <ChevronRight size={18} />}
+        </button>
+      </div>
+
+      {/* Expandable options panel */}
+      <div className={`vc-input-expand-panel ${expanded ? "vc-panel-open" : "vc-panel-closed"}`}>
+        {/* Product + upload row */}
+        <div className="vc-expand-row">
+          <span className="vc-expand-label">商品</span>
+          <div className="vc-product-selector" style={{ flex: 1, minWidth: 0 }}>
+            <button
+              type="button"
+              className="vc-product-btn-inline"
+              onClick={() => setShowProductList((v) => !v)}
+            >
+              {selectedProduct ? (
+                <>
+                  {selectedProduct.mainImage && (
+                    <img src={selectedProduct.mainImage} alt={selectedProduct.name} style={{ width: 20, height: 20, borderRadius: 5, objectFit: "cover" }} />
+                  )}
+                  <span>{selectedProduct.name}</span>
+                </>
+              ) : (
+                <span style={{ color: "rgba(23,23,25,0.38)" }}>选择商品...</span>
+              )}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, marginLeft: "auto", flexShrink: 0 }}><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+            {showProductList && (
+              <div className="vc-product-list">
+                {[...catalog].map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={form.productId === p.id ? "active" : ""}
+                    onClick={() => { set("productId", p.id); setShowProductList(false); }}
+                  >
+                    {p.mainImage && <img src={p.mainImage} alt={p.name} />}
+                    <span style={{ flex: 1 }}>{p.name}</span>
+                    {form.productId === p.id && <Check size={13} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="vc-upload-ref-btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="上传参考图"
+          >
+            <ImagePlus size={15} />
+            <span>参考图</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,video/*"
+            className="agent-hidden-file"
+            onChange={(e) => {
+              if (e.target.files) {
+                onFormChange({
+                  ...form,
+                  references: [...form.references, ...Array.from(e.target.files).map((f) => f.name)],
+                });
+              }
+            }}
+          />
+        </div>
+
+        {/* Ref thumbs */}
+        {form.references.length > 0 && (
+          <div className="vc-expand-row" style={{ paddingTop: 0 }}>
+            <span className="vc-expand-label" />
+            {form.references.map((ref, i) => (
+              <div key={i} className="vc-ref-thumb">
+                <ImagePlus size={12} style={{ flexShrink: 0 }} />
+                <span>{ref}</span>
+                <button
+                  type="button"
+                  onClick={() => onFormChange({ ...form, references: form.references.filter((_, j) => j !== i) })}
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="vc-expand-divider" />
+
+        {/* Video type */}
+        <div className="vc-expand-row">
+          <span className="vc-expand-label">类型</span>
+          <div className="vc-pill-row" style={{ flex: 1 }}>
+            {VIDEO_TYPES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`vc-pill ${form.videoType === t.id ? "active" : ""}`}
+                onClick={() => set("videoType", t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Style */}
+        <div className="vc-expand-row">
+          <span className="vc-expand-label">风格</span>
+          <div className="vc-pill-row" style={{ flex: 1 }}>
+            {STYLE_PRESETS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`vc-pill ${form.style === s.id && !form.customStyle ? "active" : ""}`}
+                onClick={() => { onFormChange({ ...form, style: s.id, customStyle: "" }); }}
+              >
+                {s.label}
+              </button>
+            ))}
+            <input
+              className={`vc-pill vc-pill-input ${form.customStyle ? "active" : ""}`}
+              placeholder="自定义..."
+              value={form.customStyle}
+              onChange={(e) => onFormChange({ ...form, customStyle: e.target.value, style: "custom" })}
+            />
+          </div>
+        </div>
+
+        <div className="vc-expand-divider" />
+
+        {/* Settings */}
+        <div className="vc-expand-row">
+          <span className="vc-expand-label">参数</span>
+          <div className="vc-chip-row">
+            <select className="vc-chip" value={form.aspectRatio} onChange={(e) => set("aspectRatio", e.target.value)}>
+              {ASPECT_RATIOS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+            </select>
+            <select className="vc-chip" value={form.duration} onChange={(e) => set("duration", e.target.value)}>
+              {DURATIONS_MAP.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+            <select className="vc-chip" value={form.resolution} onChange={(e) => set("resolution", e.target.value)}>
+              {RESOLUTIONS_MAP.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+            </select>
+          </div>
+          <button
+            type="button"
+            className="vc-submit-btn"
+            onClick={onSubmit}
+            disabled={loading || !form.description.trim()}
+            style={{ marginLeft: "auto" }}
+          >
+            {loading && <Loader2 size={14} className="vc-spin" />}
+            {loading ? "生成中..." : "生成大纲 →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── StoryboardAdjustView ──────────────────────────────────────────────────────
+
+interface StoryboardAdjustViewProps {
+  project: VideoProjectData;
+  onUpdateBeat: (id: string, description: string) => void;
+  onDeleteBeat: (id: string) => void;
+  onRegenerateBeat: (id: string) => void;
+  onConfirm: () => void;
+  onBack: () => void;
+  onReorderBeats: (newBeats: VideoProjectData["storyBeats"]) => void;
+}
+
+function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerateBeat, onConfirm, onBack, onReorderBeats }: StoryboardAdjustViewProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draggedBeatId, setDraggedBeatId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedBeatId(id);
+    e.dataTransfer.effectAllowed = "move";
+    setTimeout(() => {
+      if (e.target instanceof HTMLElement) e.target.style.opacity = "0.4";
+    }, 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedBeatId(null);
+    if (e.target instanceof HTMLElement) e.target.style.opacity = "1";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggedBeatId || draggedBeatId === targetId) return;
+
+    const sourceIndex = project.storyBeats.findIndex((b) => b.id === draggedBeatId);
+    const targetIndex = project.storyBeats.findIndex((b) => b.id === targetId);
+    
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const newBeats = Array.from(project.storyBeats);
+    const [removed] = newBeats.splice(sourceIndex, 1);
+    newBeats.splice(targetIndex, 0, removed);
+    
+    onReorderBeats(newBeats);
+  };
+
+  return (
+    <div className="vc-storyboard-adjust">
+      {/* Header */}
+      <div className="vc-storyboard-header">
+        <h2 className="vc-storyboard-title">粗略分镜调整</h2>
+        <p className="vc-storyboard-subtitle">点击文案可直接编辑，对不满意的镜头单独重新生成，确认后进入精剪</p>
+      </div>
+
+      {/* Storyboard grid */}
+      <div className="vc-storyboard-grid">
+        {project.storyBeats.map((beat, i) => (
+          <div 
+            key={beat.id} 
+            className={`vc-shot-card ${beat.status} ${draggedBeatId === beat.id ? 'dragging' : ''}`}
+            draggable={beat.status !== 'generating'}
+            onDragStart={(e) => handleDragStart(e, beat.id)}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, beat.id)}
+            style={{ cursor: beat.status !== 'generating' ? 'grab' : 'default' }}
+          >
+            {/* Thumbnail */}
+            <div className="vc-shot-thumb">
+              {beat.videoClipUrl ? (
+                <>
+                  <img src={beat.videoClipUrl} alt={beat.heading} />
+                  <div className="vc-shot-play-overlay">
+                    <Play size={18} fill="white" />
+                  </div>
+                </>
+              ) : (
+                <div className="vc-shot-placeholder">
+                  {beat.status === "generating" ? (
+                    <Loader2 size={22} className="vc-spin" style={{ color: "#4684EE" }} />
+                  ) : (
+                    <Film size={22} />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Shot info */}
+            <div className="vc-shot-info">
+              <div className="vc-shot-meta">
+                <span className="vc-shot-num">{i + 1}</span>
+                <span className="vc-shot-tag">{beat.heading}</span>
+                <span className="vc-shot-dur">{beat.duration}s</span>
+              </div>
+              {editingId === beat.id ? (
+                <textarea
+                  autoFocus
+                  className="vc-shot-desc-edit"
+                  value={beat.description}
+                  onChange={(e) => onUpdateBeat(beat.id, e.target.value)}
+                  onBlur={() => setEditingId(null)}
+                  rows={3}
+                />
+              ) : (
+                <p
+                  className="vc-shot-desc"
+                  onClick={() => setEditingId(beat.id)}
+                  title="点击编辑"
+                >
+                  {beat.description}
+                </p>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="vc-shot-actions">
+              <button
+                type="button"
+                onClick={() => onRegenerateBeat(beat.id)}
+                title="重新生成"
+                disabled={beat.status === "generating"}
+              >
+                <RefreshCw size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onDeleteBeat(beat.id)}
+                title="删除镜头"
+                className="vc-shot-delete-btn"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Add shot card */}
+        <button type="button" className="vc-shot-add">
+          <Plus size={20} />
+          <span>添加镜头</span>
+        </button>
+      </div>
+
+      {/* Footer */}
+      <div className="vc-storyboard-footer">
+        <button type="button" className="vc-storyboard-back-btn" onClick={onBack}>
+          <ChevronLeft size={16} />
+          返回修改大纲
+        </button>
+        <button type="button" className="vc-storyboard-confirm-btn" onClick={onConfirm}>
+          <Scissors size={16} />
+          确认分镜，进入精剪
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── ProjectCanvasView ─────────────────────────────────────────────────────────
+
+interface ProjectCanvasViewProps {
+  project: VideoProjectData;
+  stage: VideoCreationStage;
+  editingBeatId: string | null;
+  onEditBeat: (id: string | null) => void;
+  onUpdateBeat: (id: string, description: string) => void;
+  onRegenerateBeat: (id: string) => void;
+  onAddRef: () => void;
+}
+
+function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdateBeat, onRegenerateBeat, onAddRef }: ProjectCanvasViewProps) {
+  const completedCount = project.storyBeats.filter((b) => b.status === "done").length;
+  const isCanvas = stage === "canvas";
+  const isGenerating = stage === "generating";
+
+  return (
+    <div className="vc-canvas-doc">
+      <h2 className="vc-canvas-title">{project.title}</h2>
+
+      {/* Summary */}
+      <div className="vc-canvas-section">
+        <div className="vc-canvas-section-label">Summary</div>
+        <p className="vc-canvas-summary">{project.summary}</p>
+      </div>
+
+      {/* Settings chips */}
+      <div className="vc-canvas-chips-row">
+        <span className="vc-canvas-chip">{project.aspectRatio}</span>
+        <span className="vc-canvas-chip">~{project.duration}s</span>
+        <span className="vc-canvas-chip">{project.resolution}</span>
+        <span className="vc-canvas-chip">
+          {STYLE_PRESETS.find((s) => s.id === project.style)?.label || project.style}
+        </span>
+        <span className="vc-canvas-chip">
+          {VIDEO_TYPES.find((t) => t.id === project.videoType)?.label || project.videoType}
+        </span>
+      </div>
+
+      {/* Visual References */}
+      <div className="vc-canvas-section">
+        <div className="vc-canvas-section-label">Visual References</div>
+        <div className="vc-refs-grid">
+          {project.visualRefs.map((ref) => (
+            <div key={ref.id} className="vc-ref-card">
+              {ref.url ? (
+                <img src={ref.url} alt={ref.label} className="vc-ref-img" />
+              ) : (
+                <div className="vc-ref-placeholder">
+                  <ImagePlus size={22} />
+                </div>
+              )}
+              <span className="vc-ref-label">{ref.label}</span>
+              <small className="vc-ref-type">
+                {ref.type === "brand" ? "Brand" : ref.type === "character" ? "Character" : ref.type === "scene" ? "Scene" : "Reference"}
+              </small>
+            </div>
+          ))}
+          <button type="button" className="vc-ref-add" onClick={onAddRef} title="添加参考">
+            <Plus size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Story Beats */}
+      <div className="vc-canvas-section">
+        <div className="vc-canvas-section-label">
+          Story Beats
+          {isGenerating && (
+            <span className="vc-canvas-progress-label">
+              {completedCount}/{project.storyBeats.length}
+            </span>
+          )}
+        </div>
+        <div className="vc-beats-list">
+          {project.storyBeats.map((beat, i) => (
+            <div key={beat.id} className={`vc-beat-item ${beat.status}`}>
+              <div className="vc-beat-header">
+                <div className="vc-beat-num">{i + 1}</div>
+                <div className="vc-beat-info">
+                  <span className="vc-beat-heading">{beat.heading}</span>
+                  {beat.status === "generating" && (
+                    <Loader2 size={13} className="vc-spin vc-beat-loading" />
+                  )}
+                  {beat.status === "done" && (
+                    <Check size={13} className="vc-beat-done-icon" />
+                  )}
+                  <span className="vc-beat-duration">{beat.duration}s</span>
+                </div>
+                {beat.status === "done" && (
+                  <div className="vc-beat-actions">
+                    <button
+                      type="button"
+                      className="vc-beat-action-btn"
+                      title="重新生成此镜头"
+                      onClick={() => onRegenerateBeat(beat.id)}
+                    >
+                      <RefreshCw size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Description (editable in canvas mode) */}
+              {isCanvas && (
+                <div className="vc-beat-description">
+                  {editingBeatId === beat.id ? (
+                    <textarea
+                      autoFocus
+                      className="vc-beat-desc-edit"
+                      value={beat.description}
+                      onChange={(e) => onUpdateBeat(beat.id, e.target.value)}
+                      onBlur={() => onEditBeat(null)}
+                      rows={3}
+                    />
+                  ) : (
+                    <p
+                      className="vc-beat-desc-text"
+                      onClick={() => onEditBeat(beat.id)}
+                      title="点击编辑"
+                    >
+                      {beat.description}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Progress bar while generating */}
+              {beat.status === "generating" && (
+                <div className="vc-beat-progress-bar">
+                  <div className="vc-beat-progress-fill" />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main AgentDock Component ──────────────────────────────────────────────────
+
+export default function AgentDock({ children }: AgentDockProps) {
+  const initialConversationsRef = useRef<Conversation[] | null>(null);
+  if (!initialConversationsRef.current) {
+    initialConversationsRef.current = loadConversations();
+  }
+
+  // ── Existing state ──────────────────────────────────────────────────────────
+  const [open, setOpen] = useState(() => window.location.hash === "#agent");
+  const [input, setInput] = useState("");
+  const [conversations, setConversations] = useState<Conversation[]>(initialConversationsRef.current);
+  const [activeConversationId, setActiveConversationId] = useState(
+    initialConversationsRef.current[0]?.id ?? firstConversation.id,
+  );
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [conversationMenuId, setConversationMenuId] = useState<number | string | null>(null);
+  const [skillMenuOpen, setSkillMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const vcFileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Sidebar collapse state ──────────────────────────────────────────────────
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // ── Video creation state ────────────────────────────────────────────────────
+  const [videoCreationMode, setVideoCreationMode] = useState(false);
+  const [vcStage, setVcStage] = useState<VideoCreationStage>("setup");
+  const [vcProject, setVcProject] = useState<VideoProjectData | null>(null);
+  const [vcLoading, setVcLoading] = useState(false);
+  const [editingBeatId, setEditingBeatId] = useState<string | null>(null);
+  const [vcInputExpanded, setVcInputExpanded] = useState(false);
+  const [vcSessions, setVcSessions] = useState<VCSession[]>([]);
+  const [activeVcSessionId, setActiveVcSessionId] = useState<string | null>(null);
+  const [vcCanvasInput, setVcCanvasInput] = useState("");
+  const [vcForm, setVcForm] = useState<VCFormData>({ ...defaultVCForm });
+
+  // ── Derived state ───────────────────────────────────────────────────────────
+  const activeConversation = useMemo(
+    () => conversations.find((c) => c.id === activeConversationId) ?? conversations[0],
+    [activeConversationId, conversations],
+  );
+
+  const sortedConversations = useMemo(
+    () =>
+      [...conversations].sort((a, b) => {
+        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+        const bTime = new Date(b.updatedAt).getTime() || Number(b.id) || 0;
+        const aTime = new Date(a.updatedAt).getTime() || Number(a.id) || 0;
+        return bTime - aTime;
+      }),
+    [conversations],
+  );
+
+  const isEmptyConversation = !activeConversation || activeConversation.messages.length === 0;
+
+  // Auto-collapse sidebar in canvas mode
+  useEffect(() => {
+    if (videoCreationMode && vcStage !== "setup") {
+      setSidebarCollapsed(true);
+    }
+  }, [videoCreationMode, vcStage]);
+
+  // ── Effects ─────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  }, [conversations]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.agentConversations()
+      .then((result) => {
+        if (cancelled) return;
+        const remote = normalizeRemoteConversations(result.items || []);
+        if (!remote.length) return;
+        setConversations(remote);
+        setActiveConversationId((current) =>
+          remote.some((c) => c.id === current) ? current : remote[0].id,
+        );
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (window.location.hash === "#agent" && !window.history.state?.[agentHistoryFlag]) {
+      window.history.replaceState(
+        { ...(window.history.state ?? {}), [agentHistoryFlag]: true, returnTo: getAgentReturnTarget() },
+        "",
+        window.location.href,
+      );
+    }
+    const onPopState = () => setOpen(window.location.hash === "#agent");
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  // Handle tikframe:openVideoCreation event
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<{ productId?: string }>;
+      const productId = customEvent.detail?.productId;
+
+      const newForm = { ...defaultVCForm, productId: productId || "" };
+      setVcForm(newForm);
+
+      const next = createConversation();
+      setConversations((prev) => [next, ...prev]);
+      setActiveConversationId(next.id);
+
+      setVideoCreationMode(true);
+      setVcStage("setup");
+      setVcProject(null);
+      setVcLoading(false);
+      setVcInputExpanded(false);
+
+      if (window.location.hash !== "#agent") {
+        const returnTo = getAgentReturnTarget();
+        window.history.pushState(
+          { [agentHistoryFlag]: true, returnTo },
+          "",
+          `${returnTo}#agent`,
+        );
+      }
+      setOpen(true);
+    };
+    window.addEventListener("tikframe:openVideoCreation", handler);
+    return () => window.removeEventListener("tikframe:openVideoCreation", handler);
+  }, []);
+
+  // ── Existing handlers ───────────────────────────────────────────────────────
+
+  const openAgent = () => {
+    if (!open && window.location.hash !== "#agent") {
+      const returnTo = getAgentReturnTarget();
+      window.history.pushState(
+        { ...(window.history.state ?? {}), [agentHistoryFlag]: true, returnTo },
+        "",
+        `${returnTo}#agent`,
+      );
+    }
+    setOpen(true);
+  };
+
+  const returnToPreviousPage = () => {
+    const target = window.history.state?.returnTo ?? getAgentReturnTarget();
+    window.history.replaceState({}, "", target);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    setOpen(false);
+  };
+
+  const startNewConversation = () => {
+    const next = createConversation();
+    setConversations((prev) => [next, ...prev]);
+    setActiveConversationId(next.id);
+    setInput("");
+    setAttachments([]);
+    setConversationMenuId(null);
+    setSkillMenuOpen(false);
+  };
+
+  const selectConversation = (id: number | string) => {
+    setActiveConversationId(id);
+    setInput("");
+    setConversationMenuId(null);
+    setSkillMenuOpen(false);
+  };
+
+  const togglePinConversation = (id: number | string) => {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, pinned: !c.pinned, updatedAt: "刚刚" } : c)),
+    );
+    setConversationMenuId(null);
+  };
+
+  const renameConversation = (id: number | string) => {
+    const current = conversations.find((c) => c.id === id);
+    const nextTitle = window.prompt("重命名会话", current?.title ?? "新会话");
+    if (!nextTitle?.trim()) return;
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title: nextTitle.trim(), updatedAt: "刚刚" } : c)),
+    );
+    setConversationMenuId(null);
+  };
+
+  const deleteConversation = (id: number | string) => {
+    setConversations((prev) => {
+      const remaining = prev.filter((c) => c.id !== id);
+      if (remaining.length === 0) {
+        const next = createConversation();
+        setActiveConversationId(next.id);
+        return [next];
+      }
+      if (activeConversationId === id) setActiveConversationId(remaining[0].id);
+      return remaining;
+    });
+    setConversationMenuId(null);
+  };
+
+  const addLibraryItem = (item: LibraryItem) => {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeConversationId
+          ? {
+              ...c,
+              updatedAt: "刚刚",
+              references: Array.from(new Set([...c.references, item.title])),
+              messages: [
+                ...c.messages,
+                { id: Date.now(), role: "agent" as const, text: `已把「${item.title}」加入当前会话参考。${item.detail}` },
+              ],
+            }
+          : c,
+      ),
+    );
+    setInput((current) => (current.trim() ? `${current.trim()}，参考${item.title}` : `参考${item.title}，`));
+  };
+
+  const submitInput = async () => {
+    const text = input.trim();
+    if ((!text && attachments.length === 0) || agentLoading) return;
+    const attachmentText = attachments.length > 0 ? `，并附带 ${attachments.length} 个文件` : "";
+    const userText = text || `分析这些附件${attachmentText}`;
+    const currentAttachments = [...attachments];
+    const currentMessages = activeConversation?.messages || [];
+    const currentReferences = activeConversation?.references || [];
+    setInput("");
+    setAttachments([]);
+    setSkillMenuOpen(false);
+    const base = Date.now();
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id !== activeConversationId) return c;
+        const shouldRename = c.title === firstConversation.title || c.title === "新会话";
+        return {
+          ...c,
+          title: shouldRename ? makeConversationTitle(userText) : c.title,
+          updatedAt: "刚刚",
+          messages: [
+            ...c.messages,
+            { id: base, role: "user" as const, text: userText },
+            { id: base + 1, role: "agent" as const, text: "正在思考怎么回复你...", thinking: ["读取上下文", "判断是普通聊天还是创作指令", "组织回复"] },
+          ],
+        };
+      }),
+    );
+    setAgentLoading(true);
+    try {
+      const result = await api.agentChat({
+        message: userText,
+        conversationId: activeConversationId,
+        model: defaultAgentModel,
+        attachments: currentAttachments,
+        references: currentReferences,
+        messages: currentMessages,
+      });
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeConversationId
+            ? {
+                ...c,
+                updatedAt: "刚刚",
+                messages: c.messages.map((m) =>
+                  m.id === base + 1
+                    ? { ...m, text: result.reply, thinking: result.thinking || [], changes: result.changes || [] }
+                    : m,
+                ),
+              }
+            : c,
+        ),
+      );
+    } catch (error) {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeConversationId
+            ? {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === base + 1
+                    ? { ...m, text: error instanceof Error ? `后端 Agent 暂时不可用：${error.message}` : "后端 Agent 暂时不可用。" }
+                    : m,
+                ),
+              }
+            : c,
+        ),
+      );
+    } finally {
+      setAgentLoading(false);
+    }
+  };
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files?.length) return;
+    setAttachments((prev) => [...prev, ...Array.from(files).map((f) => f.name)]);
+  };
+
+  const selectImageCandidate = (candidate: AgentImageCandidate) => {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeConversationId
+          ? {
+              ...c,
+              references: Array.from(new Set([...c.references, candidate.title])),
+              updatedAt: "刚刚",
+              messages: [
+                ...c.messages,
+                { id: Date.now(), role: "agent" as const, text: `已选择「${candidate.title}」。你可以继续让我用这张图做图生视频，或者让我改风格、构图、光线。` },
+              ],
+            }
+          : c,
+      ),
+    );
+    setInput(`用「${candidate.title}」生成 6 秒图生视频，风格：${candidate.style || "高级电商"}，运镜要自然`);
+  };
+
+  const requestVideoFromImage = (candidate: AgentImageCandidate) => {
+    setInput(`用「${candidate.title}」做一个 6 秒图生视频，风格参考：${candidate.style || "高级电商"}，提示词：${candidate.prompt}`);
+  };
+
+  const runAction = (action: (typeof quickActions)[number]) => {
+    setInput(action.prompt);
+    setSkillMenuOpen(false);
+  };
+
+  // ── Video creation handlers ─────────────────────────────────────────────────
+
+  const handleOpenVideoCreation = () => {
+    const newForm = { ...defaultVCForm };
+    setVcForm(newForm);
+    const next = createConversation();
+    setConversations((prev) => [next, ...prev]);
+    setActiveConversationId(next.id);
+    setVideoCreationMode(true);
+    setVcStage("setup");
+    setVcProject(null);
+    setVcLoading(false);
+    setVcInputExpanded(false);
+    setInput("");
+    setAttachments([]);
+    openAgent();
+  };
+
+  const handleVCFormSubmit = async () => {
+    if (!vcForm.description.trim()) return;
+    setVcLoading(true);
+    setVcStage("outlining");
+
+    await new Promise((r) => setTimeout(r, 1800));
+
+    const product = [...catalog].find((p) => p.id === vcForm.productId);
+    const productName = product?.name ?? "商品";
+    const videoTypeLabel = VIDEO_TYPES.find((t) => t.id === vcForm.videoType)?.label ?? vcForm.videoType;
+    const styleLabel = vcForm.customStyle || (STYLE_PRESETS.find((s) => s.id === vcForm.style)?.label ?? vcForm.style);
+
+    const beats = getStoryBeats(vcForm.videoType);
+    const visualRefs: VisualRef[] = [];
+    if (product?.mainImage) {
+      visualRefs.push({ id: "r1", type: "brand", label: "商品主图", url: product.mainImage });
+    }
+    if (vcForm.videoType === "influencer" || vcForm.videoType === "skit") {
+      visualRefs.push({ id: "r2", type: "character", label: "带货主播", url: "" });
+    } else if (vcForm.videoType === "product") {
+      visualRefs.push({ id: "r2", type: "scene", label: "使用场景", url: `https://picsum.photos/seed/${vcForm.productId}/300/300` });
+    }
+
+    const projectData: VideoProjectData = {
+      title: `${productName} · ${videoTypeLabel}`,
+      summary: (summaryMap[vcForm.videoType] ?? summaryMap["product"]).replace("产品", productName),
+      productName,
+      videoType: vcForm.videoType,
+      style: vcForm.style,
+      aspectRatio: vcForm.aspectRatio,
+      duration: vcForm.duration,
+      resolution: vcForm.resolution,
+      storyBeats: beats,
+      visualRefs,
+    };
+
+    setVcProject(projectData);
+    setVcLoading(false);
+    setVcStage("canvas");
+
+    // Register this as a session
+    const sessionId = `session-${Date.now()}`;
+    const newSession: VCSession = {
+      id: sessionId,
+      conversationId: activeConversationId,
+      title: projectData.title,
+      videoType: vcForm.videoType,
+      stage: "canvas",
+      thumbnail: product?.mainImage,
+      createdAt: "刚刚",
+      project: projectData,
+      form: { ...vcForm },
+    };
+    setVcSessions((prev) => [newSession, ...prev]);
+    setActiveVcSessionId(sessionId);
+
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeConversationId
+          ? {
+              ...c,
+              title: `${productName} ${videoTypeLabel}`,
+              updatedAt: "刚刚",
+              messages: [
+                ...c.messages,
+                {
+                  id: Date.now(),
+                  role: "agent" as const,
+                  text: `大纲已生成！根据你的描述，我设计了 ${beats.length} 个分镜节拍，风格：${styleLabel}，比例 ${vcForm.aspectRatio}，时长约 ${vcForm.duration}s。\n\n你可以直接在右侧点击任意分镜描述进行修改，或者在这里告诉我调整意见。确认后点击「开始生成」，我会逐个生成视频片段。`,
+                },
+              ],
+            }
+          : c,
+      ),
+    );
+  };
+
+  const handleStartGeneration = async () => {
+    if (!vcProject) return;
+    setVcStage("generating");
+
+    for (const beat of vcProject.storyBeats) {
+      setVcProject((prev) =>
+        prev
+          ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beat.id ? { ...b, status: "generating" } : b)) }
+          : null,
+      );
+      await new Promise((r) => setTimeout(r, 1100));
+      setVcProject((prev) =>
+        prev
+          ? {
+              ...prev,
+              storyBeats: prev.storyBeats.map((b) =>
+                b.id === beat.id
+                  ? { ...b, status: "done", videoClipUrl: `https://picsum.photos/seed/${beat.id}${Date.now()}/320/568` }
+                  : b,
+              ),
+            }
+          : null,
+      );
+      await new Promise((r) => setTimeout(r, 150));
+    }
+
+    // After generating → go to storyboard adjust stage (not preview directly)
+    setVcStage("storyboard");
+
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeConversationId
+          ? {
+              ...c,
+              updatedAt: "刚刚",
+              messages: [
+                ...c.messages,
+                {
+                  id: Date.now(),
+                  role: "agent" as const,
+                  text: `🎬 视频片段生成完成！${vcProject.storyBeats.length} 个分镜全部就绪。现在进入粗略分镜调整，你可以重排、删减或单独重新生成不满意的镜头，确认后进入精剪。`,
+                },
+              ],
+            }
+          : c,
+      ),
+    );
+  };
+
+  const handleRegenerateBeat = async (beatId: string) => {
+    setVcProject((prev) =>
+      prev
+        ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beatId ? { ...b, status: "generating", videoClipUrl: undefined } : b)) }
+        : null,
+    );
+    await new Promise((r) => setTimeout(r, 1400));
+    setVcProject((prev) =>
+      prev
+        ? {
+            ...prev,
+            storyBeats: prev.storyBeats.map((b) =>
+              b.id === beatId
+                ? { ...b, status: "done", videoClipUrl: `https://picsum.photos/seed/${beatId}regen${Date.now()}/320/568` }
+                : b,
+            ),
+          }
+        : null,
+    );
+  };
+
+  const handleDeleteBeat = (beatId: string) => {
+    setVcProject((prev) =>
+      prev ? { ...prev, storyBeats: prev.storyBeats.filter((b) => b.id !== beatId) } : null,
+    );
+  };
+
+  const handleConfirmStoryboard = () => {
+    // Dispatch event for app to navigate to fine edit (OpenCut Editor)
+    window.dispatchEvent(new CustomEvent("tikframe:openProjectWorkspace", { detail: { projectId: "new-project" } }));
+    returnToPreviousPage();
+  };
+
+  const submitCanvasInput = async () => {
+    const text = vcCanvasInput.trim();
+    if (!text || agentLoading) return;
+    setVcCanvasInput("");
+    const base = Date.now();
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeConversationId
+          ? {
+              ...c,
+              updatedAt: "刚刚",
+              messages: [
+                ...c.messages,
+                { id: base, role: "user" as const, text },
+                { id: base + 1, role: "agent" as const, text: "好的，我来帮你调整分镜..." },
+              ],
+            }
+          : c,
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 1200));
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeConversationId
+          ? {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === base + 1
+                  ? { ...m, text: `已根据你的意见调整：「${text}」。你可以在右侧查看更新后的分镜描述，如果满意点击「开始生成」。` }
+                  : m,
+              ),
+            }
+          : c,
+      ),
+    );
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  // Canvas mode: stages that use the 3-column layout
+  const isCanvasMode = videoCreationMode && ["canvas", "generating", "storyboard", "preview"].includes(vcStage) && vcProject !== null;
+
+  return (
+    <div className={`agent-shell ${open ? "agent-shell-open" : ""}`}>
+      <div className="agent-page-frame">{children}</div>
+
+      <main className={`agent-full-page ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} aria-hidden={!open}>
+
+        {/* ── COLLAPSIBLE LEFT SIDEBAR ──────────────────────────────────────── */}
+        <aside className={`agent-history-sidebar ${sidebarCollapsed ? "agent-sidebar-collapsed" : ""}`} aria-label="Agent 会话历史">
+          {/* Toggle button at top */}
+          <div className="agent-sidebar-toggle-row">
+            {!sidebarCollapsed && (
+              <div className="agent-history-top">
+                <button type="button" className="agent-new-chat" onClick={() => { setVideoCreationMode(false); setSidebarCollapsed(false); startNewConversation(); }}>
+                  <Plus size={17} />
+                  新会话
+                </button>
+                <button type="button" className="agent-new-chat agent-vc-trigger" onClick={handleOpenVideoCreation}>
+                  <Film size={17} />
+                  创作
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              className="agent-sidebar-toggle-btn"
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+            >
+              {sidebarCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+            </button>
+          </div>
+
+          {/* Sidebar content (hidden when collapsed) */}
+          {!sidebarCollapsed && (
+            <>
+              <div className="agent-sidebar-library" aria-label="资料库">
+                <strong>资料库</strong>
+                {libraryItems.map((item) => (
+                  <button type="button" key={item.id} onClick={() => { setVideoCreationMode(false); addLibraryItem(item); }}>
+                    <span>{item.title}</span>
+                    <small>{item.type} · {item.detail}</small>
+                  </button>
+                ))}
+              </div>
+              <div className="agent-history-list">
+                {sortedConversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className={`agent-history-item ${conv.id === activeConversationId ? "is-active" : ""}`}
+                  >
+                    <button
+                      type="button"
+                      className="agent-history-select"
+                      onClick={() => { setVideoCreationMode(false); selectConversation(conv.id); }}
+                    >
+                      <span>{conv.pinned ? `★ ${conv.title}` : conv.title}</span>
+                      <small>{cleanAgentDisplayText(conv.messages[conv.messages.length - 1]?.text ?? "暂无消息")}</small>
+                    </button>
+                    <button
+                      type="button"
+                      className="agent-history-menu-button"
+                      aria-label="会话菜单"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConversationMenuId((c) => (c === conv.id ? null : conv.id));
+                      }}
+                    >
+                      <MoreHorizontal size={17} />
+                    </button>
+                    {conversationMenuId === conv.id && (
+                      <div className="agent-history-menu">
+                        <button type="button" onClick={() => togglePinConversation(conv.id)}>
+                          {conv.pinned ? <PinOff size={15} /> : <Pin size={15} />}
+                          {conv.pinned ? "取消置顶" : "置顶"}
+                        </button>
+                        <button type="button" onClick={() => renameConversation(conv.id)}>
+                          <Pencil size={15} />重命名
+                        </button>
+                        <button type="button" onClick={() => deleteConversation(conv.id)}>
+                          <Trash2 size={15} />删除
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </aside>
+
+        {/* Top-right back button */}
+        <button type="button" className="agent-top-back" onClick={returnToPreviousPage}>
+          <ArrowLeft size={18} />
+          返回
+        </button>
+
+        {/* ── SETUP MODE: expanding chat input ─────────────────────────────── */}
+        {videoCreationMode && (vcStage === "setup" || vcStage === "outlining") && (
+          <section className="agent-home agent-vc-home-mode">
+            {/* Centered content */}
+            <div className="vc-home-center">
+              <h1 className="vc-home-title">AI 创作视频</h1>
+              <p className="vc-home-sub">描述你想制作的视频，或选择商品直接开始</p>
+
+              {vcStage === "outlining" ? (
+                /* Loading state */
+                <div className="vc-outlining-state">
+                  <Loader2 size={32} className="vc-spin" style={{ color: "#4684EE", display: "block", margin: "0 auto 16px" }} />
+                  <p>正在分析商品信息，生成视频大纲...</p>
+                </div>
+              ) : (
+                <VCInputBox
+                  form={vcForm}
+                  onFormChange={setVcForm}
+                  onSubmit={handleVCFormSubmit}
+                  loading={vcLoading}
+                  fileInputRef={vcFileInputRef}
+                  expanded={vcInputExpanded}
+                  onExpand={() => setVcInputExpanded(true)}
+                />
+              )}
+
+              {/* Recent sessions */}
+              {vcSessions.length > 0 && vcStage === "setup" && (
+                <div className="vc-recent-sessions">
+                  <p className="vc-recent-label">最近创作</p>
+                  <div className="vc-recent-grid">
+                    {vcSessions.slice(0, 4).map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        className="vc-recent-card"
+                        onClick={() => {
+                          if (session.project) {
+                            setVcProject(session.project);
+                            setVcStage(session.stage);
+                            setActiveVcSessionId(session.id);
+                          }
+                        }}
+                      >
+                        <div className="vc-recent-thumb">
+                          {session.thumbnail ? (
+                            <img src={session.thumbnail} alt={session.title} />
+                          ) : (
+                            <Film size={18} />
+                          )}
+                        </div>
+                        <div className="vc-recent-info">
+                          <span className="vc-recent-title">{session.title}</span>
+                          <small className="vc-recent-meta">
+                            {stageLabel[session.stage]} · {session.createdAt}
+                          </small>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ── CANVAS / GENERATING / STORYBOARD MODE: 3-column ─────────────── */}
+        {isCanvasMode && (
+          <section className="agent-home agent-canvas-mode">
+
+            {/* Middle column: sessions list + agent chat */}
+            <div className="agent-canvas-sessions-col">
+              {/* Header with new session button */}
+              <div className="agent-canvas-sessions-header">
+                <span className="agent-canvas-sessions-title">视频项目</span>
+                <button type="button" className="agent-canvas-new-session-btn" onClick={handleOpenVideoCreation} title="新建创作">
+                  <Plus size={15} />
+                </button>
+              </div>
+
+              {/* Sessions list */}
+              <div className="agent-canvas-sessions-list">
+                {vcSessions.map((session) => (
+                  <button
+                    key={session.id}
+                    type="button"
+                    className={`agent-canvas-session-item ${session.id === activeVcSessionId ? "active" : ""}`}
+                    onClick={() => {
+                      if (session.project) {
+                        setVcProject(session.project);
+                        setVcStage(session.stage);
+                        setActiveVcSessionId(session.id);
+                      }
+                    }}
+                  >
+                    <div className="agent-canvas-session-thumb">
+                      {session.thumbnail ? (
+                        <img src={session.thumbnail} alt={session.title} />
+                      ) : (
+                        <Film size={14} />
+                      )}
+                    </div>
+                    <div className="agent-canvas-session-info">
+                      <span className="agent-canvas-session-title">{session.title}</span>
+                      <span className={`agent-canvas-session-status ${session.stage === "generating" ? "generating" : session.stage === "preview" ? "done" : ""}`}>
+                        {stageLabel[session.stage]}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+                {vcSessions.length === 0 && (
+                  <div className="agent-canvas-sessions-empty">
+                    <Film size={20} />
+                    <span>当前无其他项目</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Agent conversation thread */}
+              <div className="agent-canvas-chat-thread">
+                {activeConversation?.messages.map((msg) => (
+                  <div key={msg.id} className={`agent-message agent-message-${msg.role}`}>
+                    <span>{msg.role === "agent" ? "Agent" : "你"}</span>
+                    <p>{msg.role === "agent" ? cleanAgentDisplayText(msg.text) : msg.text}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Generate button (canvas stage) */}
+              {vcStage === "canvas" && (
+                <button type="button" className="vc-generate-btn" onClick={handleStartGeneration}>
+                  <Zap size={16} />
+                  开始生成
+                </button>
+              )}
+
+              {/* Generating indicator */}
+              {vcStage === "generating" && (
+                <div className="vc-generating-indicator">
+                  <Loader2 size={14} className="vc-spin" style={{ color: "#4684EE" }} />
+                  正在逐个生成视频片段...
+                </div>
+              )}
+
+              {/* Chat input (canvas and storyboard stages) */}
+              {(vcStage === "canvas" || vcStage === "storyboard") && (
+                <form
+                  className="vc-canvas-input-form"
+                  onSubmit={(e) => { e.preventDefault(); submitCanvasInput(); }}
+                >
+                  <textarea
+                    value={vcCanvasInput}
+                    onChange={(e) => setVcCanvasInput(e.target.value)}
+                    placeholder="告诉 Agent 调整..."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitCanvasInput(); }
+                    }}
+                    rows={2}
+                  />
+                  <button type="submit" disabled={agentLoading || !vcCanvasInput.trim()}>
+                    <Send size={15} />
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* Right column: canvas document or storyboard */}
+            <div className="agent-canvas-right">
+              {vcStage === "storyboard" ? (
+                <StoryboardAdjustView
+                  project={vcProject}
+                  onUpdateBeat={(id, desc) =>
+                    setVcProject((prev) =>
+                      prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === id ? { ...b, description: desc } : b)) } : null,
+                    )
+                  }
+                  onDeleteBeat={handleDeleteBeat}
+                  onRegenerateBeat={handleRegenerateBeat}
+                  onConfirm={handleConfirmStoryboard}
+                  onBack={() => setVcStage("canvas")}
+                  onReorderBeats={(newBeats) => 
+                    setVcProject((prev) => prev ? { ...prev, storyBeats: newBeats } : null)
+                  }
+                />
+              ) : (
+                <ProjectCanvasView
+                  project={vcProject}
+                  stage={vcStage}
+                  editingBeatId={editingBeatId}
+                  onEditBeat={setEditingBeatId}
+                  onUpdateBeat={(id, desc) =>
+                    setVcProject((prev) =>
+                      prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === id ? { ...b, description: desc } : b)) } : null,
+                    )
+                  }
+                  onRegenerateBeat={handleRegenerateBeat}
+                  onAddRef={() => {
+                    const name = window.prompt("输入参考图描述");
+                    if (name) {
+                      setVcProject((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              visualRefs: [
+                                ...prev.visualRefs,
+                                { id: `r${Date.now()}`, type: "custom", label: name, url: `https://picsum.photos/seed/${Date.now()}/300/300` },
+                              ],
+                            }
+                          : null,
+                      );
+                    }
+                  }}
+                />
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ── NORMAL CHAT MODE ──────────────────────────────────────────────── */}
+        {!videoCreationMode && (
+          <section className={`agent-home ${isEmptyConversation ? "agent-home-empty" : ""}`}>
+            {isEmptyConversation && <h1>你好，想创作什么？</h1>}
+
+            <div className="agent-live-panel">
+              {activeConversation && (
+                <div className="agent-thread" aria-live="polite">
+                  {activeConversation.references.length > 0 && (
+                    <div className="agent-panel-note">
+                      当前参考：{activeConversation.references.join("、")}
+                    </div>
+                  )}
+                  {activeConversation.messages.map((message) => (
+                    <div key={message.id} className={`agent-message agent-message-${message.role}`}>
+                      <span>{message.role === "agent" ? "Agent" : "你"}</span>
+                      <p>{message.role === "agent" ? cleanAgentDisplayText(message.text) : message.text}</p>
+                      {message.thinking && message.thinking.length > 0 && (
+                        <div className="agent-thinking-list">
+                          {message.thinking.map((step, index) => (
+                            <small key={`${message.id}-thinking-${index}`}>{step}</small>
+                          ))}
+                        </div>
+                      )}
+                      {message.changes && message.changes.length > 0 && (
+                        <div className="agent-change-list">
+                          {message.changes.map((change, index) => (
+                            <article key={`${message.id}-${index}`} className="agent-change-card">
+                              <strong>{change.target}</strong>
+                              <small>{change.type}</small>
+                              <p>{change.summary}</p>
+                              {change.newText && <blockquote>{change.newText}</blockquote>}
+                              {change.imageCandidates && change.imageCandidates.length > 0 && (
+                                <div className="agent-image-grid">
+                                  {change.imageCandidates.map((candidate) => (
+                                    <div key={candidate.id} className="agent-image-option">
+                                      <img src={candidate.imageUrl} alt={candidate.title} />
+                                      <div>
+                                        <strong>{candidate.title}</strong>
+                                        <small>{candidate.style || "默认风格"}</small>
+                                      </div>
+                                      <p>{candidate.prompt}</p>
+                                      <div className="agent-card-actions">
+                                        <button type="button" onClick={() => selectImageCandidate(candidate)}>选这张</button>
+                                        <button type="button" onClick={() => requestVideoFromImage(candidate)}>图生视频</button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {change.videoPlan && (
+                                <div className="agent-video-plan">
+                                  <div>
+                                    <strong>{change.videoPlan.duration || 6}s</strong>
+                                    <span>{change.videoPlan.aspectRatio || "9:16"}</span>
+                                    <span>{change.videoPlan.motion || "平滑运镜"}</span>
+                                  </div>
+                                  {change.videoPlan.prompt && <p>{change.videoPlan.prompt}</p>}
+                                  {change.videoPlan.shots && (
+                                    <ol>
+                                      {change.videoPlan.shots.map((shot) => (
+                                        <li key={shot}>{shot}</li>
+                                      ))}
+                                    </ol>
+                                  )}
+                                </div>
+                              )}
+                              {change.editActions && change.editActions.length > 0 && (
+                                <div className="agent-edit-actions">
+                                  {change.editActions.map((item) => (
+                                    <span key={`${item.action}-${item.target}`}>
+                                      {item.action} · {item.target}：{item.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <form
+              className="agent-search-pill"
+              onSubmit={(e) => { e.preventDefault(); submitInput(); }}
+            >
+              <button type="button" className="agent-add-tile" aria-label="附加文件" onClick={() => fileInputRef.current?.click()}>
+                <Plus size={28} />
+              </button>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitInput(); }
+                }}
+                placeholder="问问 TikFrame Agent"
+                rows={2}
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="agent-hidden-file"
+                onChange={(e) => handleFiles(e.currentTarget.files)}
+              />
+              <button type="button" className="agent-attach-button" aria-label="附加文件" onClick={() => fileInputRef.current?.click()}>
+                <Paperclip size={20} />
+              </button>
+              <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={() => setSkillMenuOpen((v) => !v)}>
+                <Wrench size={19} />
+                使用技能
+              </button>
+              <button type="submit" aria-label="发送给 Agent" className="agent-send-inline" disabled={agentLoading}>
+                <Send size={18} />
+              </button>
+              {skillMenuOpen && (
+                <div className="agent-skill-menu">
+                  {quickActions.map((action) => {
+                    const Icon = action.icon;
+                    return (
+                      <button key={action.label} type="button" onClick={() => runAction(action)}>
+                        <Icon size={17} />
+                        <span>{action.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </form>
+
+            {attachments.length > 0 && (
+              <div className="agent-status-strip">
+                <span>已附加：{attachments.join("、")}</span>
+              </div>
+            )}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
