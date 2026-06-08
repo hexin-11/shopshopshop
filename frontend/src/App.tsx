@@ -11,7 +11,7 @@ import type { RouteKey } from "./data/mockData";
 import { getRouteKeyFromPath, routePaths } from "./lib/routes";
 
 type Route = RouteKey | "login" | "projectWorkspace" | "productDetail";
-const AUTH_STORAGE_KEY = "vibegen-authenticated";
+const AUTH_STORAGE_KEY = "tikframe-authenticated";
 
 const routeFromLocation = (): Route => {
   const p = window.location.pathname;
@@ -32,7 +32,21 @@ export default function App() {
   useEffect(() => {
     const onPopState = () => setRoute(routeFromLocation());
     window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+
+    const onOpenProjects = () => navigate("projects");
+    window.addEventListener("tikframe:openProjects", onOpenProjects as EventListener);
+
+    const onOpenWorkspace = (e: any) => {
+      openProject(e.detail?.projectId || "new-project");
+    };
+    window.addEventListener("tikframe:openProjectWorkspace", onOpenWorkspace);
+
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("tikframe:openProjects", onOpenProjects as EventListener);
+      window.removeEventListener("tikframe:openProjectWorkspace", onOpenWorkspace);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const navigate = (next: Route) => {
@@ -82,7 +96,6 @@ export default function App() {
           productId={selectedProductId}
           onBack={() => navigate("products")}
           openProject={openProject}
-          onQuickGenerate={() => navigate("products")}
         />
       );
       case "projects":      return <VideoProjectsPage openProject={openProject} />;

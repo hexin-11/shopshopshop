@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { Bell, ChevronDown, LogOut } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Bell, Settings, LogOut, ChevronDown, Clapperboard, X } from "lucide-react";
 import type { RouteKey } from "../data/mockData";
 import { user as fallbackUser } from "../data/mockData";
 import { navItems } from "../lib/routes";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface TopNavProps {
   current: RouteKey;
@@ -17,6 +18,9 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState(fallbackUser);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const [trayOpen, setTrayOpen] = useState(false);
+  const [jobsList, setJobList] = useState<any[]>([]);
 
   useEffect(() => {
     function onScroll() {
@@ -42,6 +46,22 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  const fetchJobs = () => {
+    api.jobs().then((items) => {
+      if (items) setJobList(items as any[]);
+    });
+  };
+
+  useEffect(() => {
+    fetchJobs();
+    const interval = setInterval(fetchJobs, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const activeJobsCount = jobsList.filter((j) => j.type === "generating").length;
+
+  const mainNav = navItems.filter((item) => item.key !== "settings");
+
   return (
     <header
       className={cn(
@@ -57,7 +77,7 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
             onClick={() => navigate("dashboard")}
             className="text-[24px] font-[900] tracking-[-0.03em] text-[#171719] transition-opacity hover:opacity-80"
           >
-            VibeGen AI
+            TikFrame AI
           </button>
         </div>
 
@@ -81,9 +101,19 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
 
         <div className="flex w-0 flex-1 items-center justify-end gap-5">
           <button
-            aria-label="通知"
-            className="text-[#171719]/60 transition-colors hover:text-[#171719]"
+            onClick={() => setTrayOpen(true)}
+            className="relative text-[#171719]/60 hover:text-[#171719] transition-colors p-1"
           >
+            <Clapperboard size={20} strokeWidth={2} />
+            {activeJobsCount > 0 && (
+              <span className="absolute right-0 top-0 flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4684EE] opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#4684EE]" />
+              </span>
+            )}
+          </button>
+
+          <button className="text-[#171719]/60 hover:text-[#171719] transition-colors">
             <Bell size={20} strokeWidth={2} />
           </button>
 
@@ -123,6 +153,119 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
           </div>
         </div>
       </div>
+
+      {/* 全局任务托盘抽屉 */}
+      <AnimatePresence>
+        {trayOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setTrayOpen(false)}
+              className="fixed inset-0 z-50 bg-black"
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="fixed bottom-0 right-0 top-0 z-50 w-full max-w-[400px] border-l border-[#E5E7EB] bg-white p-6 shadow-2xl flex flex-col text-left"
+            >
+              <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-4">
+                <div className="flex items-center gap-2">
+                  <Clapperboard size={20} className="text-[#4684EE]" />
+                  <h3 className="text-[18px] font-bold text-[#171719]">视频生成进度</h3>
+                </div>
+                <button
+                  onClick={() => setTrayOpen(false)}
+                  className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto py-6 space-y-4">
+                {jobsList.map((job) => {
+                  const isActive = job.type === "generating";
+                  return (
+                    <div key={job.id} className="rounded-xl border border-[#E5E7EB] bg-neutral-50 p-5 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-[15px] font-bold text-[#171719]">{job.name}</p>
+                          <p className="text-[12px] text-[#171719]/50 mt-0.5">{job.project}</p>
+                        </div>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider",
+                          isActive ? "bg-blue-50 text-[#4684EE]" : "bg-neutral-100 text-neutral-500"
+                        )}>
+                          {job.stage}
+                        </span>
+                      </div>
+                      
+                      {isActive && (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-[12px] text-[#171719]/60">
+                            <span>正在生成...</span>
+                            <span className="font-mono">{job.progress}%</span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-[#E5E7EB] overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-[#4684EE] transition-all duration-500"
+                              style={{ width: `${job.progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 行内动作：取消/重试 */}
+                      <div className="flex justify-end gap-2 pt-1">
+                        {isActive ? (
+                          <button
+                            onClick={() => {
+                              // 模拟取消
+                              api.jobs().then((items) => {
+                                const next = (items as any[]).map((j) =>
+                                  j.id === job.id ? { ...j, type: "queued", stage: "排队中", progress: 0 } : j
+                                );
+                                setJobList(next);
+                              });
+                            }}
+                            className="text-[12px] font-semibold text-red-500 hover:bg-red-50 px-2.5 py-1 rounded transition-colors"
+                          >
+                            取消任务
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              // 模拟启动
+                              api.jobs().then((items) => {
+                                const next = (items as any[]).map((j) =>
+                                  j.id === job.id ? { ...j, type: "generating", stage: "渲染中", progress: 10 } : j
+                                );
+                                setJobList(next);
+                              });
+                            }}
+                            className="text-[12px] font-semibold text-[#4684EE] hover:bg-blue-50 px-2.5 py-1 rounded transition-colors"
+                          >
+                            启动任务
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {jobsList.length === 0 && (
+                  <div className="text-center py-12 text-neutral-400">
+                    <p className="text-[14px]">暂无任务队列</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
