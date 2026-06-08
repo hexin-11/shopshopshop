@@ -60,7 +60,7 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
 
   const activeJobsCount = jobsList.filter((j) => j.type === "generating").length;
 
-  const mainNav = navItems.filter((item) => item.key !== "settings");
+  const mainNav = navItems;
 
   return (
     <header

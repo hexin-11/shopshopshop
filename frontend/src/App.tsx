@@ -100,7 +100,7 @@ export default function App() {
       );
       case "projects":      return <VideoProjectsPage openProject={openProject} />;
       case "projectWorkspace": return <ProjectWorkspacePage navigate={(r) => navigate(r)} />;
-      default:              return <DashboardPage navigate={(r) => navigate(r)} />;
+      default:              return <DashboardPage navigate={(r) => navigate(r)} selectProduct={selectProduct} />;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, selectedProductId, isAuthenticated]);
