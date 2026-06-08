@@ -1,5 +1,5 @@
 {
-  "name": "shopclip-assets-backend",
+  "name": "tikframe-assets-backend",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -9,5 +9,12 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.1.48",
+    "@langchain/langgraph": "^1.3.6",
+    "@langchain/openai": "^1.4.7",
+    "dotenv": "^17.4.2",
+    "zod": "^4.4.3"
   }
 }

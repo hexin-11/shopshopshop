@@ -20,7 +20,7 @@ export default function Editor() {
       </button>
       <iframe
         src="/twick-studio/index.html"
-        title="VibeGen AI"
+        title="TikFrame AI"
         className="h-full w-full border-0"
         allow="cross-origin-isolated; fullscreen; clipboard-read; clipboard-write"
       />

@@ -26,7 +26,7 @@ export function StoragePersistenceDialog() {
 						runs low.
 					</p>
 					<p className="text-base text-muted-foreground">
-						Allow VibeGen AI to protect them?
+						Allow TikFrame AI to protect them?
 					</p>
 				</DialogBody>
 				<DialogFooter>

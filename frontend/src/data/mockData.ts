@@ -3,7 +3,7 @@ export type RouteKey =
 
 export const user = {
   name: "何鑫",
-  email: "hexin@vibegen.ai",
+  email: "hexin@tikframe.ai",
   role: "Owner",
   avatar: "何"
 };
@@ -91,7 +91,7 @@ export const platformPerformance = [
 ];
 
 export const versions = [
-  { name: "v1 初始脚本生成", author: "VibeGen AI", time: "昨天 14:20", note: "根据商品卖点生成初稿" },
+  { name: "v1 初始脚本生成", author: "TikFrame AI", time: "昨天 14:20", note: "根据商品卖点生成初稿" },
   { name: "v2 修改 Hook", author: "李明", time: "昨天 16:05", note: "增强前 3 秒吸引力" },
   { name: "v3 替换素材", author: "王艺", time: "今天 09:12", note: "替换为生活方式素材" },
   { name: "v4 完成剪辑", author: "何鑫", time: "今天 11:31", note: "确认字幕和节奏" }
@@ -167,7 +167,7 @@ export const productScripts: Record<string, {
 }[]> = {
   "prod-earphone": [
     {
-      id: "s1", versionLabel: "v1 初稿", note: "偏基础结构，适合快速分镜。", author: "VibeGen AI", time: "昨天 14:20",
+      id: "s1", versionLabel: "v1 初稿", note: "偏基础结构，适合快速分镜。", author: "TikFrame AI", time: "昨天 14:20",
       content: [
         { heading: "开场 Hook", body: "通勤路上总被噪音打断？戴上 Havit H630BT，把注意力还给自己。" },
         { heading: "卖点顺序", body: "主动降噪、柔软耳罩、长续航、低延迟连接。" },
@@ -196,7 +196,7 @@ export const productScripts: Record<string, {
   ],
   "prod-serum": [
     {
-      id: "s4", versionLabel: "v1 美白功效版", note: "主打成分透明度与功效。", author: "VibeGen AI", time: "2天前 11:00",
+      id: "s4", versionLabel: "v1 美白功效版", note: "主打成分透明度与功效。", author: "TikFrame AI", time: "2天前 11:00",
       content: [
         { heading: "开场 Hook", body: "用了两周，素颜也敢出门了。" },
         { heading: "卖点顺序", body: "15% 维生素C浓度 → 烟酰胺协同 → 敏感肌可用 → 30天见效。" },
@@ -207,7 +207,7 @@ export const productScripts: Record<string, {
   ],
   "prod-bottle": [
     {
-      id: "s5", versionLabel: "v1 户外场景版", note: "侧重生活方式与情感共鸣。", author: "VibeGen AI", time: "1天前 09:00",
+      id: "s5", versionLabel: "v1 户外场景版", note: "侧重生活方式与情感共鸣。", author: "TikFrame AI", time: "1天前 09:00",
       content: [
         { heading: "开场 Hook", body: "早上出门，到下班还是热的——这就是 AquaFlow 的承诺。" },
         { heading: "卖点顺序", body: "真空保温 24H → 316 食品钢 → 一键弹盖 → 颜色多选。" },
@@ -218,7 +218,7 @@ export const productScripts: Record<string, {
   ],
   "prod-shoes": [
     {
-      id: "s6", versionLabel: "v1 新品推广版", note: "突出技术参数和运动感。", author: "VibeGen AI", time: "1天前 10:30",
+      id: "s6", versionLabel: "v1 新品推广版", note: "突出技术参数和运动感。", author: "TikFrame AI", time: "1天前 10:30",
       content: [
         { heading: "开场 Hook", body: "碳纤维中底不是专业运动员的专利，普通人也值得拥有。" },
         { heading: "卖点顺序", body: "碳纤维推进板 → 氮气中底 → 透气网布 → 反光设计。" },

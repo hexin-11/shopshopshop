@@ -11,13 +11,13 @@ export const EXTERNAL_TOOLS: ExternalTool[] = [
 	{
 		name: "Marble",
 		description:
-			"Modern headless CMS for content management and the blog for VibeGen AI",
+			"Modern headless CMS for content management and the blog for TikFrame AI",
 		url: "https://marblecms.com?utm_source=opencut",
 		icon: OcMarbleIcon,
 	},
 	{
 		name: "Databuddy",
-		description: "GDPR compliant analytics and user insights for VibeGen AI",
+		description: "GDPR compliant analytics and user insights for TikFrame AI",
 		url: "https://databuddy.cc?utm_source=opencut",
 		icon: OcDataBuddyIcon,
 	},

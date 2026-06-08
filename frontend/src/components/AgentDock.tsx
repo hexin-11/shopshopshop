@@ -132,7 +132,9 @@ interface VideoProjectData {
   resolution: string;
   storyBeats: StoryBeat[];
   visualRefs: VisualRef[];
-}
+    avatar?: string;
+    ttsVoice?: string;
+  }
 
 interface VCSession {
   id: string;
@@ -333,192 +335,229 @@ interface VCInputBoxProps {
   loading: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
   expanded: boolean;
-  onExpand: () => void;
+  setExpanded: (val: boolean) => void;
+  onSkillClick: () => void;
+  skillMenuOpen: boolean;
+  quickActions: any[];
+  runAction: (a: any) => void;
 }
 
-function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expanded, onExpand }: VCInputBoxProps) {
+function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expanded, setExpanded, onSkillClick, skillMenuOpen, quickActions, runAction }: VCInputBoxProps) {
   const [showProductList, setShowProductList] = useState(false);
   const selectedProduct = catalog.find((p) => p.id === form.productId);
+  const [showAddProduct, setShowAddProduct] = useState(false);
   const set = (key: keyof VCFormData, value: string) => onFormChange({ ...form, [key]: value });
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const pill = document.querySelector('.vc-input-pill-container');
+      if (pill && !pill.contains(e.target as Node)) {
+        if (expanded && setExpanded) {
+          setExpanded(false);
+          setShowProductList(false);
+        }
+      }
+      
+      const skillMenu = document.querySelector('.agent-skill-menu');
+      const skillBtn = document.querySelector('.agent-skill-button');
+      if (skillMenuOpen && onSkillClick && skillMenu && !skillMenu.contains(e.target as Node) && skillBtn && !skillBtn.contains(e.target as Node)) {
+        onSkillClick(); // toggles it off
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [expanded, setExpanded]);
+
   return (
-    <div className={`vc-input-box-wrap ${expanded ? "vc-input-expanded" : ""}`}>
-      {/* Main input row (always visible) */}
-      <div className="vc-input-row" onClick={onExpand}>
+    <div className={`vc-input-pill-container ${expanded ? "vc-input-expanded" : ""}`} style={{position: 'relative', width: '100%', maxWidth: '900px', margin: '0 auto'}}>
+      
+      {/* 1. THE PILL FORM */}
+      <form className="agent-search-pill" onSubmit={(e) => { e.preventDefault(); onSubmit(); }} style={{margin: 0, width: '100%', overflow: 'hidden', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'}}>
         <textarea
-          className="vc-input-textarea"
-          placeholder="描述你的视频..."
           value={form.description}
           onChange={(e) => set("description", e.target.value)}
-          onFocus={onExpand}
-          rows={expanded ? 3 : 1}
+          onFocus={() => setExpanded?.(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmit(); }
+          }}
+          placeholder="描述你想制作的视频..."
+          rows={expanded ? 3 : 2}
         />
-        <button
-          type="button"
-          className="vc-input-send"
-          disabled={loading || !form.description.trim()}
-          onClick={(e) => { e.stopPropagation(); onSubmit(); }}
-          aria-label="生成大纲"
-        >
-          {loading ? <Loader2 size={16} className="vc-spin" /> : <ChevronRight size={18} />}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,video/*"
+          className="agent-hidden-file"
+          onChange={(e) => {
+            if (e.target.files) {
+              onFormChange({
+                ...form,
+                references: [...form.references, ...Array.from(e.target.files).map((f) => f.name)],
+              });
+            }
+          }}
+        />
+        
+        {/* Row 2 Buttons */}
+        <button type="button" className="agent-attach-button" aria-label="附加文件" onClick={() => fileInputRef.current?.click()}>
+          <Paperclip size={20} />
         </button>
-      </div>
-
-      {/* Expandable options panel */}
-      <div className={`vc-input-expand-panel ${expanded ? "vc-panel-open" : "vc-panel-closed"}`}>
-        {/* Product + upload row */}
-        <div className="vc-expand-row">
-          <span className="vc-expand-label">商品</span>
-          <div className="vc-product-selector" style={{ flex: 1, minWidth: 0 }}>
-            <button
-              type="button"
-              className="vc-product-btn-inline"
-              onClick={() => setShowProductList((v) => !v)}
-            >
-              {selectedProduct ? (
-                <>
-                  {selectedProduct.mainImage && (
-                    <img src={selectedProduct.mainImage} alt={selectedProduct.name} style={{ width: 20, height: 20, borderRadius: 5, objectFit: "cover" }} />
-                  )}
-                  <span>{selectedProduct.name}</span>
-                </>
-              ) : (
-                <span style={{ color: "rgba(23,23,25,0.38)" }}>选择商品...</span>
-              )}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, marginLeft: "auto", flexShrink: 0 }}><path d="m6 9 6 6 6-6" /></svg>
-            </button>
-            {showProductList && (
-              <div className="vc-product-list">
-                {[...catalog].map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={form.productId === p.id ? "active" : ""}
-                    onClick={() => { set("productId", p.id); setShowProductList(false); }}
-                  >
-                    {p.mainImage && <img src={p.mainImage} alt={p.name} />}
-                    <span style={{ flex: 1 }}>{p.name}</span>
-                    {form.productId === p.id && <Check size={13} />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            className="vc-upload-ref-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="上传参考图"
-          >
-            <ImagePlus size={15} />
-            <span>参考图</span>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,video/*"
-            className="agent-hidden-file"
-            onChange={(e) => {
-              if (e.target.files) {
-                onFormChange({
-                  ...form,
-                  references: [...form.references, ...Array.from(e.target.files).map((f) => f.name)],
-                });
-              }
-            }}
-          />
-        </div>
-
-        {/* Ref thumbs */}
-        {form.references.length > 0 && (
-          <div className="vc-expand-row" style={{ paddingTop: 0 }}>
-            <span className="vc-expand-label" />
-            {form.references.map((ref, i) => (
-              <div key={i} className="vc-ref-thumb">
-                <ImagePlus size={12} style={{ flexShrink: 0 }} />
-                <span>{ref}</span>
-                <button
-                  type="button"
-                  onClick={() => onFormChange({ ...form, references: form.references.filter((_, j) => j !== i) })}
-                >
-                  <X size={11} />
+        <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={onSkillClick}>
+          <Wrench size={19} />使用技能
+        </button>
+        <button type="button" className="agent-send-inline" disabled={loading || !form.description.trim()} onClick={(e) => { e.stopPropagation(); onSubmit(); }}>
+          {loading ? <Loader2 size={16} className="vc-spin" /> : <Send size={18} />}
+        </button>
+        
+        {/* SKILLS DROPDOWN */}
+        {skillMenuOpen && quickActions && runAction && (
+          <div className="agent-skill-menu" style={{bottom: '60px'}}>
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button key={action.label} type="button" onClick={() => runAction(action)}>
+                  <Icon size={17} />
+                  <span>{action.label}</span>
                 </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
-        <div className="vc-expand-divider" />
-
-        {/* Video type */}
-        <div className="vc-expand-row">
-          <span className="vc-expand-label">类型</span>
-          <div className="vc-pill-row" style={{ flex: 1 }}>
-            {VIDEO_TYPES.map((t) => (
+        {/* 2. THE EXPAND PANEL (Positioned beautifully INSIDE the pill) */}
+        <div className={`vc-input-expand-panel ${expanded ? "vc-panel-open" : "vc-panel-closed"}`} style={{
+          gridColumn: '1 / -1', gridRow: 3,
+          paddingTop: expanded ? '12px' : '0', 
+          marginTop: expanded ? '12px' : '0',
+          borderTop: expanded ? '1px solid #e2e8f0' : 'none',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
+          {/* Product Selector */}
+          <div className="vc-expand-row">
+            <span className="vc-expand-label">选择商品</span>
+            <div className="vc-product-selector" style={{ flex: 1, minWidth: 0 }}>
               <button
-                key={t.id}
                 type="button"
-                className={`vc-pill ${form.videoType === t.id ? "active" : ""}`}
-                onClick={() => set("videoType", t.id)}
+                className="vc-product-btn-inline"
+                onClick={() => setShowProductList((v) => !v)}
               >
-                {t.label}
+                {selectedProduct ? (
+                  <>
+                    {selectedProduct.mainImage && (
+                      <img src={selectedProduct.mainImage} alt={selectedProduct.name} style={{ width: 24, height: 24, borderRadius: 6, objectFit: "cover" }} />
+                    )}
+                    <span style={{fontWeight: 500}}>{selectedProduct.name}</span>
+                  </>
+                ) : (
+                  <span style={{ color: "rgba(23,23,25,0.4)" }}>无商品</span>
+                )}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5, marginLeft: "auto" }}><path d="m6 9 6 6 6-6" /></svg>
               </button>
-            ))}
+              {showProductList && (
+                <div className="vc-product-list" style={{boxShadow: '0 8px 24px rgba(0,0,0,0.1)', border: '1px solid #eee'}}>
+                  {[...catalog].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={form.productId === p.id ? "active" : ""}
+                      onClick={() => { set("productId", p.id); setShowProductList(false); }}
+                    >
+                      {p.mainImage && <img src={p.mainImage} alt={p.name} style={{width: 32, height: 32, borderRadius: 6}} />}
+                      <span style={{ flex: 1 }}>{p.name}</span>
+                      {form.productId === p.id && <Check size={16} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* References */}
+          {form.references.length > 0 && (
+            <div className="vc-expand-row" style={{ paddingTop: 0 }}>
+              <span className="vc-expand-label" />
+              {form.references.map((ref, i) => (
+                <div key={i} className="vc-ref-thumb" style={{background: '#f1f5f9', borderRadius: '8px', padding: '4px 8px'}}>
+                  <ImagePlus size={14} style={{ opacity: 0.6 }} />
+                  <span style={{fontSize: 13}}>{ref}</span>
+                  <button type="button" onClick={() => onFormChange({ ...form, references: form.references.filter((_, j) => j !== i) })}><X size={13} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="vc-expand-divider" style={{margin: '12px 0'}} />
+
+          {/* Type & Style */}
+          <div className="vc-expand-row">
+            <span className="vc-expand-label">类型与风格</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+              <div className="vc-pill-row">
+                {VIDEO_TYPES.map((t) => (
+                  <button key={t.id} type="button" className={`vc-pill ${form.videoType === t.id ? "active" : ""}`} onClick={() => set("videoType", t.id)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="vc-pill-row">
+                {STYLE_PRESETS.map((s) => (
+                  <button key={s.id} type="button" className={`vc-pill ${form.style === s.id && !form.customStyle ? "active" : ""}`} onClick={() => { onFormChange({ ...form, style: s.id, customStyle: "" }); }}>
+                    {s.label}
+                  </button>
+                ))}
+                <input className={`vc-pill vc-pill-input ${form.customStyle ? "active" : ""}`} placeholder="自定义风格..." value={form.customStyle} onChange={(e) => onFormChange({ ...form, customStyle: e.target.value, style: "custom" })} />
+              </div>
+            </div>
+          </div>
+
+          <div className="vc-expand-divider" style={{margin: '12px 0'}} />
+
+          {/* Parameters */}
+          <div className="vc-expand-row">
+            <span className="vc-expand-label">参数设置</span>
+            <div className="vc-pill-row" style={{flex: 1}}>
+              <div className="vc-dropdown-wrapper">
+                <select className="vc-custom-select" value={form.aspectRatio} onChange={(e) => set("aspectRatio", e.target.value)}>
+                  {ASPECT_RATIOS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+              </div>
+              
+              <div className="vc-dropdown-wrapper">
+                <select className="vc-custom-select" value={form.duration} onChange={(e) => set("duration", e.target.value)}>
+                  {DURATIONS_MAP.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+                </select>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+              </div>
+
+              <div className="vc-dropdown-wrapper">
+                <select className="vc-custom-select" value={form.resolution} onChange={(e) => set("resolution", e.target.value)}>
+                  {RESOLUTIONS_MAP.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Style */}
-        <div className="vc-expand-row">
-          <span className="vc-expand-label">风格</span>
-          <div className="vc-pill-row" style={{ flex: 1 }}>
-            {STYLE_PRESETS.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`vc-pill ${form.style === s.id && !form.customStyle ? "active" : ""}`}
-                onClick={() => { onFormChange({ ...form, style: s.id, customStyle: "" }); }}
-              >
-                {s.label}
-              </button>
-            ))}
-            <input
-              className={`vc-pill vc-pill-input ${form.customStyle ? "active" : ""}`}
-              placeholder="自定义..."
-              value={form.customStyle}
-              onChange={(e) => onFormChange({ ...form, customStyle: e.target.value, style: "custom" })}
-            />
+            </form>
+      
+      {showAddProduct && (
+        <div style={{position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={() => setShowAddProduct(false)}>
+          <div style={{background: '#fff', padding: 24, borderRadius: 20, width: 480, boxShadow: '0 20px 40px rgba(0,0,0,0.2)'}} onClick={e => e.stopPropagation()}>
+            <h3 style={{fontSize: 18, fontWeight: 600, marginBottom: 16}}>录入新商品</h3>
+            <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
+              <input placeholder="商品名称" style={{padding: '10px 14px', borderRadius: 10, border: '1px solid #ddd', outline: 'none'}} />
+              <input placeholder="商品卖点/描述" style={{padding: '10px 14px', borderRadius: 10, border: '1px solid #ddd', outline: 'none'}} />
+              <button style={{padding: '12px', background: '#f1f5f9', border: '1px dashed #ccc', borderRadius: 10, color: '#666'}}>+ 上传商品主图</button>
+            </div>
+            <div style={{display: 'flex', gap: 12, marginTop: 24, justifyContent: 'flex-end'}}>
+              <button onClick={() => setShowAddProduct(false)} style={{padding: '8px 16px', borderRadius: 8, background: '#f1f5f9'}}>取消</button>
+              <button onClick={() => setShowAddProduct(false)} style={{padding: '8px 16px', borderRadius: 8, background: '#0f172a', color: '#fff'}}>保存录入</button>
+            </div>
           </div>
         </div>
-
-        <div className="vc-expand-divider" />
-
-        {/* Settings */}
-        <div className="vc-expand-row">
-          <span className="vc-expand-label">参数</span>
-          <div className="vc-chip-row">
-            <select className="vc-chip" value={form.aspectRatio} onChange={(e) => set("aspectRatio", e.target.value)}>
-              {ASPECT_RATIOS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-            </select>
-            <select className="vc-chip" value={form.duration} onChange={(e) => set("duration", e.target.value)}>
-              {DURATIONS_MAP.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-            </select>
-            <select className="vc-chip" value={form.resolution} onChange={(e) => set("resolution", e.target.value)}>
-              {RESOLUTIONS_MAP.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-            </select>
-          </div>
-          <button
-            type="button"
-            className="vc-submit-btn"
-            onClick={onSubmit}
-            disabled={loading || !form.description.trim()}
-            style={{ marginLeft: "auto" }}
-          >
-            {loading && <Loader2 size={14} className="vc-spin" />}
-            {loading ? "生成中..." : "生成大纲 →"}
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -533,9 +572,10 @@ interface StoryboardAdjustViewProps {
   onConfirm: () => void;
   onBack: () => void;
   onReorderBeats: (newBeats: VideoProjectData["storyBeats"]) => void;
+  onUpdateProject: (data: Partial<VideoProjectData>) => void;
 }
 
-function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerateBeat, onConfirm, onBack, onReorderBeats }: StoryboardAdjustViewProps) {
+function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerateBeat, onConfirm, onBack, onReorderBeats, onUpdateProject }: StoryboardAdjustViewProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draggedBeatId, setDraggedBeatId] = useState<string | null>(null);
 
@@ -598,10 +638,7 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
             <div className="vc-shot-thumb">
               {beat.videoClipUrl ? (
                 <>
-                  <img src={beat.videoClipUrl} alt={beat.heading} />
-                  <div className="vc-shot-play-overlay">
-                    <Play size={18} fill="white" />
-                  </div>
+                  <video src={beat.videoClipUrl} controls autoPlay loop style={{width: "100%", height: "100%", objectFit: "cover"}} />
                 </>
               ) : (
                 <div className="vc-shot-placeholder">
@@ -695,9 +732,10 @@ interface ProjectCanvasViewProps {
   onUpdateBeat: (id: string, description: string) => void;
   onRegenerateBeat: (id: string) => void;
   onAddRef: () => void;
+  onUpdateProject?: (data: Partial<VideoProjectData>) => void;
 }
 
-function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdateBeat, onRegenerateBeat, onAddRef }: ProjectCanvasViewProps) {
+function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdateBeat, onRegenerateBeat, onAddRef, onUpdateProject }: ProjectCanvasViewProps) {
   const completedCount = project.storyBeats.filter((b) => b.status === "done").length;
   const isCanvas = stage === "canvas";
   const isGenerating = stage === "generating";
@@ -1031,21 +1069,11 @@ export default function AgentDock({ children }: AgentDockProps) {
     setConversations((prev) =>
       prev.map((c) =>
         c.id === activeConversationId
-          ? {
-              ...c,
-              updatedAt: "刚刚",
-              references: Array.from(new Set([...c.references, item.title])),
-              messages: [
-                ...c.messages,
-                { id: Date.now(), role: "agent" as const, text: `已把「${item.title}」加入当前会话参考。${item.detail}` },
-              ],
-            }
-          : c,
-      ),
+          ? { ...c, references: Array.from(new Set([...c.references, item.title])) }
+          : c
+      )
     );
-    setInput((current) => (current.trim() ? `${current.trim()}，参考${item.title}` : `参考${item.title}，`));
   };
-
   const submitInput = async () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || agentLoading) return;
@@ -1247,35 +1275,61 @@ export default function AgentDock({ children }: AgentDockProps) {
     );
   };
 
+  
+  const generateClip = async (prompt, imageUrl, ratio, duration) => {
+    try {
+      const createRes = await fetch('/api/generate-clip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, imageUrl, ratio, duration })
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok || !createData.taskId) {
+        console.error("Generate failed:", createData);
+        return null;
+      }
+      
+      const taskId = createData.taskId;
+      while (true) {
+        await new Promise(r => setTimeout(r, 5000));
+        const statusRes = await fetch(`/api/generate-clip/status?taskId=${taskId}`);
+        const statusData = await statusRes.json();
+        if (statusData.status === 'succeeded') {
+          return statusData.content.video_url;
+        } else if (statusData.status === 'failed') {
+          console.error("Task failed:", statusData);
+          return null;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  };
+
   const handleStartGeneration = async () => {
     if (!vcProject) return;
     setVcStage("generating");
 
     for (const beat of vcProject.storyBeats) {
+      setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beat.id ? { ...b, status: "generating" } : b)) } : null);
+      
+      const imageUrl = vcProject.visualRefs?.[0]?.url || "";
+      const videoUrl = await generateClip(beat.description, imageUrl, vcProject.aspectRatio, parseInt(vcProject.duration) || 5);
+      
       setVcProject((prev) =>
-        prev
-          ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beat.id ? { ...b, status: "generating" } : b)) }
-          : null,
+        prev ? {
+          ...prev,
+          storyBeats: prev.storyBeats.map((b) =>
+            b.id === beat.id
+              ? { ...b, status: "done", videoClipUrl: videoUrl || `https://picsum.photos/seed/${beat.id}${Date.now()}/320/568` }
+              : b
+          )
+        } : null
       );
-      await new Promise((r) => setTimeout(r, 1100));
-      setVcProject((prev) =>
-        prev
-          ? {
-              ...prev,
-              storyBeats: prev.storyBeats.map((b) =>
-                b.id === beat.id
-                  ? { ...b, status: "done", videoClipUrl: `https://picsum.photos/seed/${beat.id}${Date.now()}/320/568` }
-                  : b,
-              ),
-            }
-          : null,
-      );
-      await new Promise((r) => setTimeout(r, 150));
     }
 
-    // After generating → go to storyboard adjust stage (not preview directly)
     setVcStage("storyboard");
-
     setConversations((prev) =>
       prev.map((c) =>
         c.id === activeConversationId
@@ -1284,11 +1338,7 @@ export default function AgentDock({ children }: AgentDockProps) {
               updatedAt: "刚刚",
               messages: [
                 ...c.messages,
-                {
-                  id: Date.now(),
-                  role: "agent" as const,
-                  text: `🎬 视频片段生成完成！${vcProject.storyBeats.length} 个分镜全部就绪。现在进入粗略分镜调整，你可以重排、删减或单独重新生成不满意的镜头，确认后进入精剪。`,
-                },
+                { id: Date.now(), role: "agent" as const, text: `🎬 视频片段生成完成！${vcProject.storyBeats.length} 个分镜全部就绪。现在进入粗略分镜调整，你可以重排、删减或单独重新生成不满意的镜头，确认后进入精剪。` },
               ],
             }
           : c,
@@ -1297,23 +1347,24 @@ export default function AgentDock({ children }: AgentDockProps) {
   };
 
   const handleRegenerateBeat = async (beatId: string) => {
+    if (!vcProject) return;
+    setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beatId ? { ...b, status: "generating", videoClipUrl: undefined } : b)) } : null);
+    
+    const beat = vcProject.storyBeats.find(b => b.id === beatId);
+    if (!beat) return;
+    
+    const imageUrl = vcProject.visualRefs?.[0]?.url || "";
+    const videoUrl = await generateClip(beat.description, imageUrl, vcProject.aspectRatio, parseInt(vcProject.duration) || 5);
+    
     setVcProject((prev) =>
-      prev
-        ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beatId ? { ...b, status: "generating", videoClipUrl: undefined } : b)) }
-        : null,
-    );
-    await new Promise((r) => setTimeout(r, 1400));
-    setVcProject((prev) =>
-      prev
-        ? {
-            ...prev,
-            storyBeats: prev.storyBeats.map((b) =>
-              b.id === beatId
-                ? { ...b, status: "done", videoClipUrl: `https://picsum.photos/seed/${beatId}regen${Date.now()}/320/568` }
-                : b,
-            ),
-          }
-        : null,
+      prev ? {
+          ...prev,
+          storyBeats: prev.storyBeats.map((b) =>
+            b.id === beatId
+              ? { ...b, status: "done", videoClipUrl: videoUrl || `https://picsum.photos/seed/${beatId}regen${Date.now()}/320/568` }
+              : b
+          )
+        } : null
     );
   };
 
@@ -1375,18 +1426,6 @@ export default function AgentDock({ children }: AgentDockProps) {
     <div className={`agent-shell ${open ? "agent-shell-open" : ""}`}>
       <div className="agent-page-frame">{children}</div>
 
-      {/* Floating orb (closed state) */}
-      {!open && (
-        <button type="button" aria-label="打开 Agent" className="agent-orb" onClick={openAgent}>
-          <span className="agent-orb-ring" />
-          <span className="agent-orb-core">
-            <Wand2 size={22} />
-            <span>Agent</span>
-          </span>
-          <span className="agent-orb-hint">打开工作助手</span>
-        </button>
-      )}
-
       <main className={`agent-full-page ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} aria-hidden={!open}>
 
         {/* ── COLLAPSIBLE LEFT SIDEBAR ──────────────────────────────────────── */}
@@ -1395,13 +1434,9 @@ export default function AgentDock({ children }: AgentDockProps) {
           <div className="agent-sidebar-toggle-row">
             {!sidebarCollapsed && (
               <div className="agent-history-top">
-                <button type="button" className="agent-new-chat" onClick={() => { setVideoCreationMode(false); setSidebarCollapsed(false); startNewConversation(); }}>
+                <button type="button" className="agent-new-chat" onClick={handleOpenVideoCreation}>
                   <Plus size={17} />
                   新会话
-                </button>
-                <button type="button" className="agent-new-chat agent-vc-trigger" onClick={handleOpenVideoCreation}>
-                  <Film size={17} />
-                  创作
                 </button>
               </div>
             )}
@@ -1418,10 +1453,10 @@ export default function AgentDock({ children }: AgentDockProps) {
           {/* Sidebar content (hidden when collapsed) */}
           {!sidebarCollapsed && (
             <>
-              <div className="agent-sidebar-library" aria-label="资料库">
-                <strong>资料库</strong>
+              <div className="agent-sidebar-library" aria-label="资产库">
+                <strong>资产库</strong>
                 {libraryItems.map((item) => (
-                  <button type="button" key={item.id} onClick={() => { setVideoCreationMode(false); addLibraryItem(item); }}>
+                  <button type="button" key={item.id} onClick={() => addLibraryItem(item)}>
                     <span>{item.title}</span>
                     <small>{item.type} · {item.detail}</small>
                   </button>
@@ -1436,7 +1471,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                     <button
                       type="button"
                       className="agent-history-select"
-                      onClick={() => { setVideoCreationMode(false); selectConversation(conv.id); }}
+                      onClick={() => selectConversation(conv.id)}
                     >
                       <span>{conv.pinned ? `★ ${conv.title}` : conv.title}</span>
                       <small>{cleanAgentDisplayText(conv.messages[conv.messages.length - 1]?.text ?? "暂无消息")}</small>
@@ -1501,7 +1536,11 @@ export default function AgentDock({ children }: AgentDockProps) {
                   loading={vcLoading}
                   fileInputRef={vcFileInputRef}
                   expanded={vcInputExpanded}
-                  onExpand={() => setVcInputExpanded(true)}
+                  setExpanded={setVcInputExpanded}
+                  onSkillClick={() => setSkillMenuOpen(v => !v)}
+                  skillMenuOpen={skillMenuOpen}
+                  quickActions={quickActions}
+                  runAction={runAction}
                 />
               )}
 
@@ -1625,10 +1664,7 @@ export default function AgentDock({ children }: AgentDockProps) {
 
               {/* Chat input (canvas and storyboard stages) */}
               {(vcStage === "canvas" || vcStage === "storyboard") && (
-                <form
-                  className="vc-canvas-input-form"
-                  onSubmit={(e) => { e.preventDefault(); submitCanvasInput(); }}
-                >
+                <form className="agent-search-pill" style={{marginTop: 'auto', marginBottom: 20, width: '100%', overflow: 'visible'}} onSubmit={(e) => { e.preventDefault(); submitCanvasInput(); }}>
                   <textarea
                     value={vcCanvasInput}
                     onChange={(e) => setVcCanvasInput(e.target.value)}
@@ -1638,16 +1674,41 @@ export default function AgentDock({ children }: AgentDockProps) {
                     }}
                     rows={2}
                   />
-                  <button type="submit" disabled={agentLoading || !vcCanvasInput.trim()}>
-                    <Send size={15} />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,video/*"
+                    className="agent-hidden-file"
+                  />
+                  <button type="button" className="agent-attach-button" aria-label="附加文件" onClick={() => fileInputRef.current?.click()}>
+                    <Paperclip size={20} />
                   </button>
+                  <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={() => setSkillMenuOpen(v => !v)}>
+                    <Wrench size={19} />使用技能
+                  </button>
+                  <button type="submit" disabled={agentLoading || !vcCanvasInput.trim()} className="agent-send-inline">
+                    {agentLoading ? <Loader2 size={16} className="vc-spin" /> : <Send size={18} />}
+                  </button>
+
+                  {skillMenuOpen && (
+                    <div className="agent-skill-menu" style={{bottom: '60px', left: 0, right: 'auto'}}>
+                      {quickActions.map((action) => {
+                        const Icon = action.icon;
+                        return (
+                          <button key={action.label} type="button" onClick={() => runAction(action)}>
+                            <Icon size={17} />
+                            <span>{action.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </form>
               )}
-            </div>
-
-            {/* Right column: canvas document or storyboard */}
-            <div className="agent-canvas-right">
-              {vcStage === "storyboard" ? (
+              </div>
+              <div className="agent-canvas-right">
+                {vcStage === "storyboard" ? (
                 <StoryboardAdjustView
                   project={vcProject}
                   onUpdateBeat={(id, desc) =>
@@ -1659,9 +1720,8 @@ export default function AgentDock({ children }: AgentDockProps) {
                   onRegenerateBeat={handleRegenerateBeat}
                   onConfirm={handleConfirmStoryboard}
                   onBack={() => setVcStage("canvas")}
-                  onReorderBeats={(newBeats) => 
-                    setVcProject((prev) => prev ? { ...prev, storyBeats: newBeats } : null)
-                  }
+                  onReorderBeats={(newBeats) => setVcProject((prev) => prev ? { ...prev, storyBeats: newBeats } : null)}
+                  onUpdateProject={(data) => setVcProject((prev) => prev ? { ...prev, ...data } : null)}
                 />
               ) : (
                 <ProjectCanvasView
@@ -1675,6 +1735,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                     )
                   }
                   onRegenerateBeat={handleRegenerateBeat}
+                  onUpdateProject={(data) => setVcProject(prev => prev ? {...prev, ...data} : null)}
                   onAddRef={() => {
                     const name = window.prompt("输入参考图描述");
                     if (name) {
@@ -1787,9 +1848,7 @@ export default function AgentDock({ children }: AgentDockProps) {
               className="agent-search-pill"
               onSubmit={(e) => { e.preventDefault(); submitInput(); }}
             >
-              <button type="button" className="agent-add-tile" aria-label="附加文件" onClick={() => fileInputRef.current?.click()}>
-                <Plus size={28} />
-              </button>
+              
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

@@ -1,7 +1,7 @@
-export const SITE_URL = "https://vibegen.ai";
+export const SITE_URL = "https://tikframe.ai";
 
 export const SITE_INFO = {
-	title: "VibeGen AI",
+	title: "TikFrame AI",
 	description:
 		"AI video creation and editing workspace.",
 	url: SITE_URL,

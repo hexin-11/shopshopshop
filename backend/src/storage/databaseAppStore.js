@@ -1,4 +1,4 @@
-// ShopClip 业务数据库接入预留位置。
+﻿// TikFrame 业务数据库接入预留位置。
 //
 // 这里负责承接前端工作台除素材文件本体以外的核心业务数据：
 // users, members, products, productScripts, videoProjects, renderJobs,
@@ -16,3 +16,4 @@
 export function createDatabaseAppStore() {
   throw new Error("业务数据库尚未配置。请实现 backend/src/storage/databaseAppStore.js，并设置 APP_STORE=database。");
 }
+

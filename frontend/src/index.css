@@ -233,14 +233,19 @@ button, input, select, textarea { font: inherit; }
 
 .agent-page-frame {
   min-height: 100vh;
-  transform: translateX(0);
-  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1), filter 420ms ease;
-  will-change: transform;
+  transform: scale(1) translateY(0);
+  transform-origin: top center;
+  transition: transform 500ms cubic-bezier(0.32, 0.72, 0, 1), filter 500ms ease, border-radius 500ms ease;
+  will-change: transform, filter;
+  border-radius: 0;
 }
 
 .agent-shell-open .agent-page-frame {
-  transform: translateX(-100vw);
-  filter: saturate(0.96) blur(1px);
+  transform: scale(0.95) translateY(2vh);
+  filter: blur(12px) brightness(0.65);
+  border-radius: 24px;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .agent-orb {
@@ -255,6 +260,7 @@ button, input, select, textarea { font: inherit; }
   padding: 0;
   color: #fff;
   background: #171719;
+  transition: all 0.2s ease;
   box-shadow: 0 22px 60px rgba(23, 23, 25, 0.26);
   cursor: pointer;
   transition: right 260ms cubic-bezier(0.16, 1, 0.3, 1), bottom 260ms cubic-bezier(0.16, 1, 0.3, 1), transform 260ms ease;
@@ -318,15 +324,20 @@ button, input, select, textarea { font: inherit; }
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #ffffff;
-  transform: translateX(100%);
-  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(255, 255, 255, 0.0);
+  transform: translateY(100%);
+  transition: transform 500ms cubic-bezier(0.32, 0.72, 0, 1), background 500ms ease;
   pointer-events: none;
 }
 
 .agent-shell-open .agent-full-page {
-  transform: translateX(0);
+  transform: translateY(0);
   pointer-events: auto;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(40px) saturate(1.5);
+  border-top-left-radius: 32px;
+  border-top-right-radius: 32px;
+  box-shadow: 0 -20px 80px rgba(0,0,0,0.15);
 }
 
 .agent-history-sidebar {
@@ -338,7 +349,8 @@ button, input, select, textarea { font: inherit; }
   width: 240px;
   border-right: 1px solid rgba(226, 232, 240, 0.78);
   padding: 14px 12px;
-  background: #f7f7f8;
+  background: transparent;
+  border-right: 1px solid rgba(0,0,0,0.06);
   backdrop-filter: none;
   transition: width 280ms cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
@@ -460,6 +472,8 @@ button, input, select, textarea { font: inherit; }
   white-space: nowrap;
   font-size: 13px;
   font-weight: 850;
+  width: 100%;
+  display: block;
 }
 
 .agent-sidebar-library small {
@@ -679,7 +693,7 @@ button, input, select, textarea { font: inherit; }
 
 .agent-drawing-workspace {
   display: grid;
-  grid-template-columns: minmax(220px, 0.72fr) minmax(240px, 1fr);
+  grid-template-columns: 420px minmax(240px, 1fr);
   gap: 14px;
 }
 
@@ -817,6 +831,7 @@ button, input, select, textarea { font: inherit; }
   color: #fff;
   border-color: transparent;
   background: #171719;
+  transition: all 0.2s ease;
 }
 
 .agent-thinking-list {
@@ -947,6 +962,7 @@ button, input, select, textarea { font: inherit; }
 .agent-card-actions button:last-child {
   color: #fff;
   background: #171719;
+  transition: all 0.2s ease;
 }
 
 .agent-video-plan,
@@ -1056,7 +1072,7 @@ button, input, select, textarea { font: inherit; }
 .agent-search-pill {
   position: relative;
   display: grid;
-  grid-template-columns: 42px auto minmax(0, 1fr) 42px 42px;
+  grid-template-columns: 42px max-content minmax(0, 1fr) 42px;
   grid-template-rows: minmax(58px, auto) 40px;
   align-items: center;
   gap: 8px;
@@ -1113,17 +1129,10 @@ button, input, select, textarea { font: inherit; }
   background: rgba(23, 23, 25, 0.07);
 }
 
-.agent-search-pill .agent-add-tile {
-  grid-column: 1;
-  grid-row: 2;
-  width: 40px;
-  height: 40px;
-  color: rgba(23, 23, 25, 0.5);
-  background: rgba(241, 245, 249, 0.94);
-  transform: none;
-}
+
 
 .agent-search-pill .agent-skill-button {
+  margin-left: -4px;
   grid-row: 2;
   grid-column: 2;
   padding: 0 13px;
@@ -1131,19 +1140,20 @@ button, input, select, textarea { font: inherit; }
 }
 
 .agent-search-pill .agent-attach-button {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.agent-search-pill .agent-send-inline {
+  grid-row: 2;
+}
+
+.agent-search-pill .agent-send-inline {
   grid-column: 4;
-  grid-row: 2;
-}
-
-.agent-search-pill .agent-send-inline {
-  grid-row: 2;
-}
-
-.agent-search-pill .agent-send-inline {
-  grid-column: 5;
   width: 42px;
   color: #fff;
   background: #171719;
+  transition: all 0.2s ease;
   border-radius: 999px;
 }
 
@@ -1316,17 +1326,18 @@ button, input, select, textarea { font: inherit; }
   }
 
   .agent-search-pill .agent-skill-button {
+  margin-left: -4px;
     grid-column: 2;
     grid-row: 2;
   }
 
   .agent-search-pill .agent-attach-button {
-    grid-column: 4;
+    grid-column: 1;
     grid-row: 2;
   }
 
   .agent-search-pill .agent-send-inline {
-    grid-column: 5;
+    grid-column: 4;
     grid-row: 2;
     width: 36px;
   }
@@ -1455,6 +1466,7 @@ button, input, select, textarea { font: inherit; }
   border: 0;
   border-radius: 10px;
   background: #171719;
+  transition: all 0.2s ease;
   color: #fff;
   cursor: pointer;
   flex-shrink: 0;
@@ -1768,6 +1780,7 @@ button, input, select, textarea { font: inherit; }
   font-weight: 800;
   color: #fff;
   background: #171719;
+  transition: all 0.2s ease;
   cursor: pointer;
   transition: background 180ms ease, opacity 180ms ease;
 }
@@ -1780,10 +1793,10 @@ button, input, select, textarea { font: inherit; }
 /* ── Canvas workspace 3-column ───────────────────────────────────────────── */
 
 .agent-home.agent-canvas-mode {
-  flex-direction: row !important;
+  display: grid !important;
+  grid-template-columns: max(450px, 45%) minmax(0, 1fr) !important;
   padding: 0 0 0 240px !important;
   align-items: stretch !important;
-  justify-content: flex-start !important;
   gap: 0 !important;
   overflow: hidden;
   transition: padding-left 280ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -1798,7 +1811,9 @@ button, input, select, textarea { font: inherit; }
 .agent-canvas-sessions-col {
   display: flex;
   flex-direction: column;
-  width: 260px;
+  padding: 24px 20px;
+
+  width: 100%;
   flex-shrink: 0;
   height: 100vh;
   border-right: 1px solid rgba(226, 232, 240, 0.78);
@@ -1934,6 +1949,7 @@ button, input, select, textarea { font: inherit; }
   font-weight: 800;
   color: #fff;
   background: #171719;
+  transition: all 0.2s ease;
   cursor: pointer;
   flex-shrink: 0;
   transition: background 160ms ease;
@@ -1982,7 +1998,8 @@ button, input, select, textarea { font: inherit; }
   display: flex; align-items: center; justify-content: center;
   width: 38px; height: 38px;
   border: 0; border-radius: 10px;
-  background: #171719; color: #fff;
+  background: #171719;
+  transition: all 0.2s ease; color: #fff;
   cursor: pointer; flex-shrink: 0;
   transition: background 150ms ease;
 }
@@ -1999,7 +2016,7 @@ button, input, select, textarea { font: inherit; }
 }
 
 .vc-canvas-doc {
-  max-width: 720px;
+  max-width: 960px;
   padding: 48px 52px 80px;
   margin: 0 auto;
 }
@@ -2164,7 +2181,8 @@ button, input, select, textarea { font: inherit; }
 .vc-preview-video { width: 190px; aspect-ratio: 9/16; object-fit: cover; display: block; }
 .vc-preview-actions { display: flex; gap: 12px; justify-content: center; }
 .vc-preview-btn { display: flex; align-items: center; gap: 8px; border-radius: 14px; padding: 12px 20px; font-size: 14px; font-family: inherit; font-weight: 800; cursor: pointer; border: 0; transition: all 150ms ease; }
-.vc-preview-btn-primary { background: #171719; color: #fff; }
+.vc-preview-btn-primary { background: #171719;
+  transition: all 0.2s ease; color: #fff; }
 .vc-preview-btn-primary:hover { background: #2563eb; }
 .vc-preview-btn-secondary { background: rgba(23,23,25,0.07); color: #171719; }
 .vc-preview-btn-secondary:hover { background: rgba(23,23,25,0.11); }
@@ -2174,7 +2192,7 @@ button, input, select, textarea { font: inherit; }
     padding: 0 !important;
     flex-direction: column !important;
   }
-  .agent-canvas-sessions-col { width: 100%; height: 40vh; border-right: 0; border-bottom: 1px solid rgba(226,232,240,0.78); }
+  
   .agent-canvas-right { height: 60vh; }
   .vc-canvas-doc { padding: 24px 20px 60px; }
   .agent-home.agent-vc-home-mode { padding-left: 16px; padding-right: 16px; }
@@ -2377,8 +2395,58 @@ button, input, select, textarea { font: inherit; }
   font-size: 14px; font-family: inherit; font-weight: 800;
   color: #fff;
   background: #171719;
+  transition: all 0.2s ease;
   cursor: pointer;
   transition: background 160ms ease;
 }
 .vc-storyboard-confirm-btn:hover { background: #2563eb; }
 
+
+
+
+
+.agent-search-pill .agent-send-inline:hover:not(:disabled) { transform: scale(1.05); background: #4684EE; }
+
+.vc-dropdown-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.vc-dropdown-wrapper svg {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+.vc-custom-select {
+  appearance: none;
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  border-radius: 99px;
+  padding: 6px 32px 6px 14px;
+  font-size: 13px;
+  color: #333;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.vc-custom-select:hover {
+  background: #e2e8f0;
+}
+.vc-custom-select:focus {
+  border-color: #4684EE;
+  background: #fff;
+}
+
+@keyframes progressAnim {
+  0% { width: 0%; }
+  50% { width: 60%; }
+  90% { width: 85%; }
+  100% { width: 100%; }
+}
+
+.agent-home {
+  min-height: 100vh !important;
+  height: 100vh !important;
+  background: #fff;
+}

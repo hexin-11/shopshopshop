@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+﻿import { createServer } from "node:http";
 import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { extname, join, basename } from "node:path";
@@ -357,7 +357,7 @@ async function handleApi(req, res) {
   if (pathname === "/api/health" && req.method === "GET") {
     return sendJson(res, 200, {
       status: "ok",
-      service: "shopclip-backend",
+      service: "tikframe-backend",
       assetStore: assetStore.name,
       appStore: appStore.name,
       time: new Date().toISOString()
@@ -507,7 +507,7 @@ async function handleApi(req, res) {
       id: payload.id || createId("script"),
       versionLabel: payload.versionLabel || `v${scripts.length + 1} 新脚本`,
       note: payload.note || "新生成的脚本版本。",
-      author: payload.author || "ShopClip AI",
+      author: payload.author || "TikFrame AI",
       time: payload.time || "刚刚",
       content: Array.isArray(payload.content) ? payload.content : []
     };
@@ -791,6 +791,80 @@ async function handleApi(req, res) {
     return;
   }
 
+
+  // --- Seedance API Integration ---
+  if (pathname === "/api/generate-clip" && req.method === "POST") {
+    let payload;
+    try {
+      payload = await readBody(req);
+    } catch (error) {
+      return badRequest(res, error.message);
+    }
+    
+    const arkApiKey = process.env.ARK_API_KEY || "YOUR_ARK_API_KEY"; // Please set this in your environment
+    
+    const content = [];
+    if (payload.prompt) {
+      content.push({ type: "text", text: payload.prompt });
+    }
+    if (payload.imageUrl) {
+      content.push({ type: "image_url", image_url: { url: payload.imageUrl } });
+    }
+    
+    if (content.length === 0) {
+      return badRequest(res, "prompt or imageUrl is required");
+    }
+
+    try {
+      const response = await fetch("https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${arkApiKey}`
+        },
+        body: JSON.stringify({
+          model: "doubao-seedance-1-5-pro-251215",
+          content,
+          generate_audio: payload.generateAudio ?? true,
+          ratio: payload.ratio || "16:9",
+          duration: payload.duration || 5,
+          watermark: false
+        })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        return sendJson(res, response.status, { error: data });
+      }
+      return sendJson(res, 201, { taskId: data.id });
+    } catch (error) {
+      return sendJson(res, 500, { error: error.message });
+    }
+  }
+
+  if (pathname === "/api/generate-clip/status" && req.method === "GET") {
+    const taskId = searchParams.get("taskId");
+    if (!taskId) return badRequest(res, "taskId is required");
+    
+    const arkApiKey = process.env.ARK_API_KEY || "YOUR_ARK_API_KEY";
+    try {
+      const response = await fetch(`https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/${taskId}`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${arkApiKey}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return sendJson(res, response.status, { error: data });
+      }
+      return sendJson(res, 200, data);
+    } catch (error) {
+      return sendJson(res, 500, { error: error.message });
+    }
+  }
+  // --- End Seedance API ---
+
   if (pathname === "/api/assets/meta/filters" && req.method === "GET") {
     return sendJson(res, 200, buildFilters(await readAssets()));
   }
@@ -905,5 +979,6 @@ const server = createServer((req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`ShopClip backend is running at http://localhost:${port}`);
+  console.log(`TikFrame backend is running at http://localhost:${port}`);
 });
+

@@ -1,4 +1,4 @@
-# ShopClip AI 数据库预留清单
+# TikFrame AI 数据库预留清单
 
 当前演示阶段使用 JSON 文件模拟数据库：
 

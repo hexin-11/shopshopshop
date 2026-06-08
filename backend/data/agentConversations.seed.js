@@ -1,8 +1,8 @@
-export default {
+﻿export default {
   conversations: [
     {
       id: "agent-conv-welcome",
-      title: "ShopClip 创作助手",
+      title: "TikFrame 创作助手",
       pinned: true,
       references: [],
       createdAt: "2026-06-03T00:00:00.000Z",
@@ -18,3 +18,4 @@ export default {
     },
   ],
 };
+

@@ -7,7 +7,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
-  const [email, setEmail] = useState("hexin@vibegen.ai");
+  const [email, setEmail] = useState("hexin@tikframe.ai");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
 
@@ -26,7 +26,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <Film size={23} />
             </div>
             <div>
-              <div className="text-xl font-black tracking-tight">VibeGen AI</div>
+              <div className="text-xl font-black tracking-tight">TikFrame AI</div>
               <div className="text-sm font-medium text-[#171719]/55">电商短视频创作工作台</div>
             </div>
           </div>
@@ -59,7 +59,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4684EE] text-white">
                 <Clapperboard size={22} />
               </div>
-              <div className="text-xl font-black tracking-tight">VibeGen AI</div>
+              <div className="text-xl font-black tracking-tight">TikFrame AI</div>
             </div>
 
             <div className="rounded-[28px] border border-[#DDE8F5] bg-white p-8 shadow-[0_30px_90px_rgba(15,23,42,0.08)]">

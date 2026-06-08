@@ -6,6 +6,24 @@ import { api } from "../lib/api";
 import { AddProductDialog } from "../components/product/AddProductDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 
+const productStatusLabel: Record<string, string> = {
+  已发布: "已上架",
+  制作中: "资料制作中",
+  待审核: "待审核",
+  排队中: "资料待补全",
+};
+
+const productStatusClass: Record<string, string> = {
+  已上架: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  资料制作中: "border-neutral-200 bg-neutral-100 text-neutral-700",
+  待审核: "border-amber-200 bg-amber-50 text-amber-700",
+  资料待补全: "border-neutral-200 bg-white text-neutral-500",
+};
+
+function getProductStatus(product: any) {
+  return product.commerceStatus || productStatusLabel[product.status] || product.status || "资料待补全";
+}
+
 export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id: string) => void }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
@@ -93,58 +111,61 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
           }}
         >
           {filtered.map((product) => (
-            <motion.button
-              key={product.id}
-              onClick={() => onSelectProduct(product.id)}
-              variants={{
-                hidden: { opacity: 0, y: 10 },
-                visible: { opacity: 1, y: 0 }
-              }}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-              className={`
-                card card-hover group relative flex flex-col overflow-hidden text-left
-              `}
-            >
-              {/* 封面 */}
-              <div className="h-48 bg-neutral-50 border-b border-[#E5E7EB] relative flex items-center justify-center overflow-hidden">
-                {product.mainImage ? (
-                  <img src={product.mainImage} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                ) : (
-                  <span className="text-5xl opacity-40 grayscale">📦</span>
-                )}
-                <div className="absolute right-4 top-4 bg-white/80 backdrop-blur-sm p-1.5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ArrowUpRight
-                    size={16}
-                    className="text-[#171719]"
-                  />
-                </div>
-              </div>
-
-              {/* 商品信息 */}
-              <div className="flex flex-1 flex-col p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-[18px] font-bold text-[#171719]">{product.name}</p>
-                    <p className="mt-1 text-[14px] text-[#171719]/50">{product.brand}</p>
+            (() => {
+              const status = getProductStatus(product);
+              return (
+                <motion.button
+                  key={product.id}
+                  onClick={() => onSelectProduct(product.id)}
+                  variants={{
+                    hidden: { opacity: 0, y: 10 },
+                    visible: { opacity: 1, y: 0 }
+                  }}
+                  whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                  className="card card-hover group relative flex flex-col overflow-hidden text-left"
+                >
+                  {/* 封面 */}
+                  <div className="h-48 bg-neutral-50 border-b border-[#E5E7EB] relative flex items-center justify-center overflow-hidden">
+                    {product.mainImage ? (
+                      <img src={product.mainImage} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    ) : (
+                      <Package size={44} className="text-neutral-300" />
+                    )}
+                    <div className="absolute right-4 top-4 bg-white/80 backdrop-blur-sm p-1.5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ArrowUpRight
+                        size={16}
+                        className="text-[#171719]"
+                      />
+                    </div>
                   </div>
-                  <span className="badge">
-                    {product.status}
-                  </span>
-                </div>
 
-                <div className="mt-5">
-                  <span className="rounded bg-neutral-50 border border-[#E5E7EB] px-2.5 py-1 text-[13px] font-medium text-[#171719]/60">
-                    {product.category}
-                  </span>
-                </div>
+                  {/* 商品信息 */}
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[18px] font-bold text-[#171719]">{product.name}</p>
+                        <p className="mt-1 text-[14px] text-[#171719]/50">{product.brand}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold ${productStatusClass[status] || productStatusClass["资料待补全"]}`}>
+                        {status}
+                      </span>
+                    </div>
 
-                <div className="mt-6 flex items-center gap-4 border-t border-[#E5E7EB] pt-5 text-[14px] font-medium text-[#171719]/50">
-                  <span>{product.assetCount} 个素材</span>
-                  <span>{product.scriptCount} 个脚本</span>
-                  <span>{product.projectCount} 个项目</span>
-                </div>
-              </div>
-            </motion.button>
+                    <div className="mt-5">
+                      <span className="rounded bg-neutral-50 border border-[#E5E7EB] px-2.5 py-1 text-[13px] font-medium text-[#171719]/60">
+                        {product.category}
+                      </span>
+                    </div>
+
+                    <div className="mt-6 grid grid-cols-3 gap-3 border-t border-[#E5E7EB] pt-5 text-[13px] font-medium text-[#171719]/50">
+                      <span>{product.assetCount} 素材</span>
+                      <span>{product.projectCount} 作品</span>
+                      <span className="truncate">{product.updatedAt}</span>
+                    </div>
+                  </div>
+                </motion.button>
+              );
+            })()
           ))}
         </motion.div>
       ) : (

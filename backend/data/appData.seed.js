@@ -1,6 +1,6 @@
-const appData = {
+﻿const appData = {
   users: [
-    { id: "user-hexin", name: "何鑫", email: "hexin@shopclip.ai", role: "Owner", avatar: "何" }
+    { id: "user-hexin", name: "何鑫", email: "hexin@tikframe.ai", role: "Owner", avatar: "何" }
   ],
   members: [
     { id: "member-hexin", name: "何鑫", role: "Owner", avatar: "何", online: true, editing: "剪辑台 / 镜头 1" },
@@ -76,7 +76,7 @@ const appData = {
         id: "script-earphone-v1",
         versionLabel: "v1 初稿",
         note: "偏基础结构，适合快速分镜。",
-        author: "ShopClip AI",
+        author: "TikFrame AI",
         time: "昨天 14:20",
         content: [
           { heading: "开场 Hook", body: "通勤路上总被噪音打断？戴上 Havit H630BT，把注意力还给自己。" },
@@ -104,7 +104,7 @@ const appData = {
         id: "script-serum-v1",
         versionLabel: "v1 美白功效版",
         note: "主打成分透明度与功效。",
-        author: "ShopClip AI",
+        author: "TikFrame AI",
         time: "2天前 11:00",
         content: [
           { heading: "开场 Hook", body: "用了两周，素颜也敢出门了。" },
@@ -119,7 +119,7 @@ const appData = {
         id: "script-bottle-v1",
         versionLabel: "v1 户外场景版",
         note: "侧重生活方式与情感共鸣。",
-        author: "ShopClip AI",
+        author: "TikFrame AI",
         time: "1天前 09:00",
         content: [
           { heading: "开场 Hook", body: "早上出门，到下班还是热的。这就是 AquaFlow 的承诺。" },
@@ -134,7 +134,7 @@ const appData = {
         id: "script-shoes-v1",
         versionLabel: "v1 新品推广版",
         note: "突出技术参数和运动感。",
-        author: "ShopClip AI",
+        author: "TikFrame AI",
         time: "1天前 10:30",
         content: [
           { heading: "开场 Hook", body: "碳纤维中底不是专业运动员的专利，普通人也值得拥有。" },
@@ -177,3 +177,4 @@ const appData = {
 };
 
 export default appData;
+
