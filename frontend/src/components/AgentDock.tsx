@@ -532,10 +532,46 @@ interface StoryboardAdjustViewProps {
   onRegenerateBeat: (id: string) => void;
   onConfirm: () => void;
   onBack: () => void;
+  onReorderBeats: (newBeats: VideoProjectData["storyBeats"]) => void;
 }
 
-function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerateBeat, onConfirm, onBack }: StoryboardAdjustViewProps) {
+function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerateBeat, onConfirm, onBack, onReorderBeats }: StoryboardAdjustViewProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [draggedBeatId, setDraggedBeatId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedBeatId(id);
+    e.dataTransfer.effectAllowed = "move";
+    setTimeout(() => {
+      if (e.target instanceof HTMLElement) e.target.style.opacity = "0.4";
+    }, 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedBeatId(null);
+    if (e.target instanceof HTMLElement) e.target.style.opacity = "1";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggedBeatId || draggedBeatId === targetId) return;
+
+    const sourceIndex = project.storyBeats.findIndex((b) => b.id === draggedBeatId);
+    const targetIndex = project.storyBeats.findIndex((b) => b.id === targetId);
+    
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const newBeats = Array.from(project.storyBeats);
+    const [removed] = newBeats.splice(sourceIndex, 1);
+    newBeats.splice(targetIndex, 0, removed);
+    
+    onReorderBeats(newBeats);
+  };
 
   return (
     <div className="vc-storyboard-adjust">
@@ -548,7 +584,16 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
       {/* Storyboard grid */}
       <div className="vc-storyboard-grid">
         {project.storyBeats.map((beat, i) => (
-          <div key={beat.id} className={`vc-shot-card ${beat.status}`}>
+          <div 
+            key={beat.id} 
+            className={`vc-shot-card ${beat.status} ${draggedBeatId === beat.id ? 'dragging' : ''}`}
+            draggable={beat.status !== 'generating'}
+            onDragStart={(e) => handleDragStart(e, beat.id)}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, beat.id)}
+            style={{ cursor: beat.status !== 'generating' ? 'grab' : 'default' }}
+          >
             {/* Thumbnail */}
             <div className="vc-shot-thumb">
               {beat.videoClipUrl ? (
@@ -1279,8 +1324,8 @@ export default function AgentDock({ children }: AgentDockProps) {
   };
 
   const handleConfirmStoryboard = () => {
-    // Dispatch event for app to navigate to fine edit / projects page
-    window.dispatchEvent(new CustomEvent("shopclip:openProjects"));
+    // Dispatch event for app to navigate to fine edit (OpenCut Editor)
+    window.dispatchEvent(new CustomEvent("shopclip:openProjectWorkspace", { detail: { projectId: "new-project" } }));
     returnToPreviousPage();
   };
 
@@ -1614,6 +1659,9 @@ export default function AgentDock({ children }: AgentDockProps) {
                   onRegenerateBeat={handleRegenerateBeat}
                   onConfirm={handleConfirmStoryboard}
                   onBack={() => setVcStage("canvas")}
+                  onReorderBeats={(newBeats) => 
+                    setVcProject((prev) => prev ? { ...prev, storyBeats: newBeats } : null)
+                  }
                 />
               ) : (
                 <ProjectCanvasView

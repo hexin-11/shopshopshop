@@ -30,7 +30,21 @@ export default function App() {
   useEffect(() => {
     const onPopState = () => setRoute(routeFromLocation());
     window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+
+    const onOpenProjects = () => navigate("projects");
+    window.addEventListener("shopclip:openProjects", onOpenProjects as EventListener);
+
+    const onOpenWorkspace = (e: any) => {
+      openProject(e.detail?.projectId || "new-project");
+    };
+    window.addEventListener("shopclip:openProjectWorkspace", onOpenWorkspace);
+
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("shopclip:openProjects", onOpenProjects as EventListener);
+      window.removeEventListener("shopclip:openProjectWorkspace", onOpenWorkspace);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const navigate = (next: Route) => {
@@ -68,7 +82,6 @@ export default function App() {
           productId={selectedProductId}
           onBack={() => navigate("products")}
           openProject={openProject}
-          onQuickGenerate={() => navigate("products")}
         />
       );
       case "projects":      return <VideoProjectsPage openProject={openProject} />;

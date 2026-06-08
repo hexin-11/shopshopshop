@@ -35,12 +35,6 @@ import { ResponsiveContainer, AreaChart, Area, Tooltip } from "recharts";
 
 type Tab = "dashboard" | "assets";
 
-interface ChatMessage {
-  id: string;
-  role: "user" | "ai";
-  content: string;
-}
-
 const getAssetTypeIcon = (type: string) => {
   switch (type) {
     case "商品图片": return <ImageIcon size={48} strokeWidth={1.5} />;
@@ -130,7 +124,6 @@ interface ProductDetailPageProps {
   productId: string;
   onBack: () => void;
   openProject: (projectId: string) => void;
-  onQuickGenerate: () => void;
 }
 
 export default function ProductDetailPage({
@@ -149,28 +142,11 @@ export default function ProductDetailPage({
 
   // --- Asset Library State ---
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
-  const [mainImageId, setMainImageId] = useState<string>("产品正面主图_4K.jpg");
+  const [mainImageId, setMainImageId] = useState<string>("产品正面主图_4K.jpg"); // Mock default
   const [activeCategory, setActiveCategory] = useState<"all" | "image" | "video" | "audio">("all");
   const [assetToSetMain, setAssetToSetMain] = useState<string | null>(null);
 
-  useEffect(() => {
-    const defaultProduct = catalog.find((p) => p.id === productId) ?? catalog[0];
-    setProduct(defaultProduct);
-    setLocalProduct(defaultProduct);
-    setLocalAssets(mockAssets);
-
-    api.product(productId).then((p) => {
-      setProduct(p);
-      setLocalProduct(p);
-    });
-    api.productAssets(productId).then((items) => {
-      setLocalAssets(items as any[]);
-    });
-  }, [productId]);
-
-  const filteredAssets = localAssets.filter(asset =>
-    activeCategory === "all" || getAssetCategory(asset.type) === activeCategory
-  );
+  // --- Asset Upload Simulator ---
   const handleUploadAsset = () => {
     const assetTypes = ["商品图片", "商品视频", "生活方式图", "参考视频", "音频 / BGM"];
     const randomType = assetTypes[Math.floor(Math.random() * assetTypes.length)];
@@ -192,7 +168,36 @@ export default function ProductDetailPage({
     const newAsset = {
       name: randomName,
       type: randomType,
-      tags: ["新�
+      tags: ["新上传", randomType.split(" / ")[0]],
+      owner: "何鑫",
+      used: 0,
+      color: "from-blue-100 to-indigo-100",
+    };
+
+    setLocalAssets(prev => [newAsset, ...prev]);
+  };
+
+
+
+  useEffect(() => {
+    const defaultProduct = catalog.find((p) => p.id === productId) ?? catalog[0];
+    setProduct(defaultProduct);
+    setLocalProduct(defaultProduct);
+    setLocalAssets(mockAssets);
+
+    api.product(productId).then((p) => {
+      setProduct(p);
+      setLocalProduct(p);
+    });
+    api.productAssets(productId).then((items) => {
+      setLocalAssets(items as any[]);
+    });
+  }, [productId]);
+
+  const filteredAssets = localAssets.filter(asset => 
+    activeCategory === "all" || getAssetCategory(asset.type) === activeCategory
+  );
+
   // Asset Methods
   const toggleAsset = (assetName: string) => {
     const newSet = new Set(selectedAssets);
@@ -223,30 +228,7 @@ export default function ProductDetailPage({
     }
   };
 
-  const tabs = [
-    { key: "dashboard", label: "效果概览", icon: BarChart2 },
-    { key: "assets",    label: "项目素材库", icon: ImageIcon },
-  ] as const;
 
-症福音。" },
-            { heading: "转化引导", body: "现在点击左下角，还有专属粉丝福利哦！" },
-          ]
-        });
-      } else {
-        // Mocking an update
-        const updatedScript = { ...localScript };
-        updatedScript.content[0].body = "【AI 已调整语气】" + updatedScript.content[0].body;
-        setLocalScript(updatedScript);
-      }
-    }, 2000);
-  };
-
-  // Auto scroll chat
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatHistory, isGenerating]);
 
   const tabs = [
     { key: "dashboard", label: "效果概览", icon: BarChart2 },
@@ -598,10 +580,10 @@ export default function ProductDetailPage({
                             <Trash2 size={16} /> 批量删除
                           </button>
                           <button 
-                            onClick={handleCreateScriptFromAssets} 
+                            onClick={handleCreateVideo} 
                             className="text-sm font-bold text-blue-900 bg-blue-400 hover:bg-blue-300 px-5 py-2 rounded-full transition-colors flex items-center gap-2"
                           >
-                            <Zap size={16} /> 生成脚本
+                            <Zap size={16} /> AI 创作视频
                           </button>
                         </div>
                       </motion.div>
@@ -609,245 +591,10 @@ export default function ProductDetailPage({
                   </AnimatePresence>
                 </motion.div>
               )}
-
-              {/* 3. AI 脚本 Tab */}
-              {tab === "scripts" && (
-                <motion.div 
-                  key="scripts"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex flex-col"
-                >
-                  {!selectedScriptId ? (
-                    // 脚本列表视图
-                    <div className="flex flex-col gap-6">
-                      <div className="flex justify-between items-center">
-                        <p className="text-sm text-neutral-500">选择一个已有脚本继续编辑，或让 AI 为您生成新创意。</p>
-                        <button onClick={handleGenerateNewScript} className="btn-primary shrink-0">
-                          <Plus size={16} /> 生成新脚本
-                        </button>
-                      </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {scripts.map((s, i) => (
-                          <motion.button
-                            key={s.id}
-                            onClick={() => handleSelectExistingScript(s)}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.05 }}
-                            className="p-6 rounded-xl border border-neutral-200 bg-white text-left hover:border-blue-400 hover:shadow-sm transition-all group"
-                          >
-                            <div className="flex justify-between items-start mb-4">
-                              <h3 className="text-lg font-bold text-neutral-900 group-hover:text-blue-600 transition-colors">{s.versionLabel}</h3>
-                              <span className="text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-500">{s.content.length} 个分镜</span>
-                            </div>
-                            <p className="text-sm text-neutral-500 mb-6 line-clamp-2">{s.note}</p>
-                            <div className="flex items-center justify-between text-xs font-medium text-neutral-400 border-t border-neutral-100 pt-4">
-                              <span>{s.author}</span>
-                              <span>{s.time}</span>
-                            </div>
-                          </motion.button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    // 对话式生成视图 (Split-View Copilot)
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="grid xl:grid-cols-[380px_1fr] gap-6 min-h-[700px]"
-                    >
-                      {/* 左侧：AI 聊天流 */}
-                      <div className="flex flex-col border border-neutral-200 bg-neutral-50 rounded-xl overflow-hidden shadow-sm">
-                        <div className="p-4 border-b border-neutral-200 bg-white flex justify-between items-center shrink-0">
-                          <h3 className="font-bold text-neutral-800 flex items-center gap-2">
-                            <Bot size={18} className="text-blue-600"/> 智能脚本助手
-                          </h3>
-                          <button onClick={() => setSelectedScriptId(null)} className="text-xs font-bold text-neutral-400 hover:text-neutral-700 transition-colors">
-                            返回列表
-                          </button>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
-                          {chatHistory.map(msg => (
-                            <div key={msg.id} className={`flex gap-3 max-w-[95%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}>
-                              <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-neutral-200 text-blue-600'}`}>
-                                {msg.role === 'user' ? <User size={16}/> : <Bot size={16}/>}
-                              </div>
-                              <div className={`p-3.5 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none shadow-sm' : 'bg-white border border-neutral-200 text-neutral-700 rounded-tl-none shadow-sm'}`}>
-                                {msg.content}
-                              </div>
-                            </div>
-                          ))}
-                          {isGenerating && (
-                            <div className="flex gap-3 max-w-[95%] self-start">
-                              <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center shadow-sm bg-white border border-neutral-200 text-blue-600">
-                                <Bot size={16}/>
-                              </div>
-                              <div className="p-3.5 rounded-2xl text-sm bg-white border border-neutral-200 text-neutral-500 rounded-tl-none shadow-sm flex items-center gap-2">
-                                <Loader2 size={14} className="animate-spin" /> AI 正在思考中...
-                              </div>
-                            </div>
-                          )}
-                          <div ref={chatEndRef} />
-                        </div>
-
-                        <div className="p-3 bg-white border-t border-neutral-200 shrink-0">
-                          <div className="relative">
-                            <textarea 
-                              value={chatInput}
-                              onChange={e => setChatInput(e.target.value)}
-                              placeholder="告诉 AI 您的想法或修改意见..."
-                              className="w-full bg-neutral-50 border border-neutral-200 rounded-lg pl-3 pr-12 py-3 text-sm resize-none focus:outline-none focus:border-blue-400 focus:bg-white transition-colors"
-                              rows={2}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter' && !e.shiftKey) { 
-                                  e.preventDefault(); 
-                                  handleSendMessage(); 
-                                }
-                              }}
-                            />
-                            <button 
-                              onClick={handleSendMessage} 
-                              disabled={!chatInput.trim() || isGenerating} 
-                              className="absolute right-2 bottom-2 p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                            >
-                              <Send size={14}/>
-                            </button>
-                          </div>
-                          <p className="text-[10px] text-neutral-400 text-center mt-2">按 Enter 发送，Shift + Enter 换行</p>
-                        </div>
-                      </div>
-
-                      {/* 右侧：实时文档区 (Live Document) */}
-                      <div className="flex flex-col border border-neutral-200 bg-white rounded-xl overflow-hidden shadow-sm">
-                        <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex justify-between items-center shrink-0">
-                          <h3 className="font-bold text-neutral-800 flex items-center gap-2">
-                            <FileText size={16} className="text-neutral-500" />
-                            {localScript ? localScript.versionLabel : '新建草稿'}
-                          </h3>
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={handleSaveScriptVersion} 
-                              disabled={!localScript} 
-                              className="btn-secondary h-8 px-3 text-xs shrink-0 disabled:opacity-50"
-                            >
-                              <Save size={14} /> 保存为新版本
-                            </button>
-                            <button onClick={() => setIsWizardOpen(true)} disabled={!localScript} className="btn-primary h-8 px-3 text-xs shrink-0 disabled:opacity-50">
-                              <Play size={14} /> 从此脚本新建项目
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto p-6 bg-neutral-50/30 relative">
-                          {!localScript && !isGenerating && (
-                            <div className="h-full flex flex-col items-center justify-center text-neutral-400">
-                              <Bot size={48} className="mb-4 opacity-20" />
-                              <p className="text-sm font-medium text-neutral-600">等待生成中...</p>
-                              <p className="text-xs mt-1 text-center max-w-[200px]">请在左侧向 AI 描述您的需求，以自动生成分镜脚本。</p>
-                            </div>
-                          )}
-                          
-                          {!localScript && isGenerating && (
-                            <div className="flex flex-col gap-6 animate-pulse">
-                              {[1,2,3,4].map(i => (
-                                <div key={i} className="flex gap-4">
-                                  <div className="w-32 h-24 bg-neutral-200 rounded-lg shrink-0"></div>
-                                  <div className="flex-1 space-y-3 p-5 border border-neutral-100 rounded-xl bg-white">
-                                    <div className="flex justify-between">
-                                      <div className="h-4 w-1/4 bg-blue-100 rounded"></div>
-                                      <div className="h-4 w-8 bg-neutral-100 rounded"></div>
-                                    </div>
-                                    <div className="h-3 w-full bg-neutral-100 rounded mt-4"></div>
-                                    <div className="h-3 w-4/5 bg-neutral-100 rounded"></div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {localScript && (
-                            <div className="flex flex-col gap-6">
-                              <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg flex items-center gap-2 text-xs text-blue-700">
-                                <Zap size={14} className="shrink-0" />
-                                <span>提示：您可以随时让左侧的 AI 帮您修改，也可以直接点击下方任意文本框进行<b>手动编辑</b>。</span>
-                              </div>
-                              {localScript.content.map((shot: any, index: number) => (
-                                <motion.div 
-                                  key={index} 
-                                  initial={{ opacity: 0, y: 10 }} 
-                                  animate={{ opacity: 1, y: 0 }} 
-                                  transition={{ delay: index * 0.05 }} 
-                                  className="flex gap-4 group"
-                                >
-                                  {/* 关联素材区 */}
-                                  <div 
-                                    onClick={() => setBindingShotIndex(index)}
-                                    className="w-32 h-24 shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 flex flex-col items-center justify-center text-neutral-400 cursor-pointer hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all overflow-hidden relative group"
-                                  >
-                                    {shot.boundAsset ? (
-                                      <>
-                                        <div className="absolute inset-0 flex items-center justify-center bg-blue-50/30">
-                                          {getAssetTypeIcon(shot.boundAssetType || "商品图片")}
-                                        </div>
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                          <span className="text-[10px] text-white font-bold bg-blue-600 px-2 py-1 rounded">更换素材</span>
-                                        </div>
-                                        <div className="absolute bottom-0 left-0 right-0 bg-neutral-900/75 py-1 px-1.5 text-center">
-                                          <p className="text-[9px] text-white truncate font-medium">{shot.boundAsset}</p>
-                                        </div>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <ImageIcon size={20} className="mb-1 text-neutral-400 group-hover:text-blue-500" />
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 group-hover:text-blue-500">指定素材</span>
-                                      </>
-                                    )}
-                                  </div>
-                                  
-                                  {/* 文本内容编辑器 */}
-                                  <div className="flex-1 rounded-xl border border-neutral-200 bg-white hover:border-blue-300 transition-colors shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 focus-within:shadow-md overflow-hidden flex flex-col">
-                                    <div className="flex justify-between items-center px-4 py-2 bg-neutral-50/80 border-b border-neutral-100">
-                                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-widest">
-                                        镜头 {index + 1} - {shot.heading}
-                                      </span>
-                                      <span className="text-xs font-medium text-neutral-400">约 5s</span>
-                                    </div>
-                                    <textarea
-                                      className="w-full flex-1 p-4 text-sm text-neutral-700 resize-none outline-none bg-transparent"
-                                      value={shot.body}
-                                      rows={2}
-                                      onChange={(e) => {
-                                        const newScript = {...localScript};
-                                        newScript.content[index].body = e.target.value;
-                                        setLocalScript(newScript);
-                                      }}
-                                    />
-                                  </div>
-                                </motion.div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </motion.div>
-              )}
             </AnimatePresence>
           </div>
         </div>
       </div>
-      <CreateProjectWizard
-        open={isWizardOpen}
-        onOpenChange={setIsWizardOpen}
-        product={product}
-        scripts={scripts}
-        onCreated={(project) => openProject(project.id)}
-      />
 
       <AlertDialog open={!!assetToSetMain} onOpenChange={(open) => !open && setAssetToSetMain(null)}>
         <AlertDialogContent>
@@ -867,53 +614,6 @@ export default function ProductDetailPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={bindingShotIndex !== null} onOpenChange={(open) => !open && setBindingShotIndex(null)}>
-        <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col bg-white">
-          <DialogHeader className="border-b border-neutral-100 pb-4">
-            <DialogTitle className="text-lg font-bold text-neutral-900">选择关联素材</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto py-4 space-y-4">
-            <p className="text-xs text-neutral-500">选择该商品的图片或视频素材，将其绑定到分镜中作为背景参考。</p>
-            <div className="grid grid-cols-3 gap-3">
-              {localAssets.filter(a => getAssetCategory(a.type) === "image" || getAssetCategory(a.type) === "video").map((asset) => {
-                const isSelected = localScript?.content[bindingShotIndex!]?.boundAsset === asset.name;
-                return (
-                  <div
-                    key={asset.name}
-                    onClick={() => {
-                      if (localScript && bindingShotIndex !== null) {
-                        const newScript = { ...localScript };
-                        if (!newScript.content[bindingShotIndex]) return;
-                        newScript.content[bindingShotIndex].boundAsset = asset.name;
-                        newScript.content[bindingShotIndex].boundAssetType = asset.type;
-                        setLocalScript(newScript);
-                        setBindingShotIndex(null);
-                      }
-                    }}
-                    className={`p-3 rounded-lg border-2 text-left cursor-pointer transition-all flex flex-col items-center gap-2 hover:border-blue-400
-                      ${isSelected ? 'border-blue-500 bg-blue-50/20' : 'border-neutral-100 bg-white'}
-                    `}
-                  >
-                    <div className="w-full h-20 bg-neutral-50 rounded flex items-center justify-center text-neutral-300">
-                      {getAssetTypeIcon(asset.type)}
-                    </div>
-                    <span className="text-[11px] font-bold text-neutral-800 truncate w-full text-center">{asset.name}</span>
-                  </div>
-                );
-              })}
-            </div>
-            {localAssets.filter(a => getAssetCategory(a.type) === "image" || getAssetCategory(a.type) === "video").length === 0 && (
-              <div className="text-center py-8 text-neutral-400 text-sm">
-                当前产品暂无可用的图片或视频素材，请先上传素材。
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end gap-3 border-t border-neutral-100 pt-4">
-            <button onClick={() => setBindingShotIndex(null)} className="btn-ghost px-5">取消</button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
