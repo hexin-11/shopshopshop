@@ -44,6 +44,8 @@ function safeErrorMessage(prefix, status, responseText) {
 export function getArkConfig(env = process.env) {
   return {
     apiKey: env.ARK_API_KEY,
+    textApiKey: env.ARK_TEXT_API_KEY || env.ARK_API_KEY,
+    videoApiKey: env.ARK_VIDEO_API_KEY || env.ARK_API_KEY,
     textEndpoint: stripTrailingSlash(env.ARK_TEXT_MODEL_ENDPOINT || DEFAULT_TEXT_ENDPOINT),
     videoEndpoint: stripTrailingSlash(env.ARK_VIDEO_MODEL_ENDPOINT || DEFAULT_VIDEO_ENDPOINT),
     textModel: env.ARK_TEXT_MODEL_NAME || DEFAULT_TEXT_MODEL,
@@ -71,13 +73,13 @@ export async function generateText(options, env = process.env) {
     };
   }
 
-  requireConfig(config, ["apiKey", "textEndpoint", "textModel"]);
+  requireConfig(config, ["textApiKey", "textEndpoint", "textModel"]);
 
   const response = await fetch(config.textEndpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${config.textApiKey}`,
     },
     body: JSON.stringify({
       model: config.textModel,
@@ -122,7 +124,7 @@ export async function createVideoTask(options, env = process.env) {
     };
   }
 
-  requireConfig(config, ["apiKey", "videoEndpoint", "videoModel"]);
+  requireConfig(config, ["videoApiKey", "videoEndpoint", "videoModel"]);
 
   const content = [];
   if (options.prompt) content.push({ type: "text", text: options.prompt });
@@ -137,7 +139,7 @@ export async function createVideoTask(options, env = process.env) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${config.videoApiKey}`,
     },
     body: JSON.stringify({
       model: config.videoModel,
@@ -187,12 +189,12 @@ export async function getVideoTask(taskId, env = process.env) {
     };
   }
 
-  requireConfig(config, ["apiKey", "videoEndpoint"]);
+  requireConfig(config, ["videoApiKey", "videoEndpoint"]);
 
   const response = await fetch(`${config.videoEndpoint}/${encodeURIComponent(taskId)}`, {
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${config.videoApiKey}`,
     },
   });
 

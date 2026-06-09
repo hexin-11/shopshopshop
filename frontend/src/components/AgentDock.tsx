@@ -348,11 +348,13 @@ const makeConversationTitle = (text: string) => {
   return clean.length > 16 ? `${clean.slice(0, 16)}...` : clean;
 };
 
-const cleanAgentDisplayText = (text: string) =>
-  text
+const cleanAgentDisplayText = (text: string) => {
+  if (!text) return "";
+  return (text || "").replace(/```json\n[\s\S]*?\n```/g, "已完成处理。").replace(/```/g, "")
     .replace(/(?:Fast|Pro|Deep|Standard)\s*模式已收到。?\s*/g, "")
     .replace(/我先围绕/g, "我已围绕")
     .trim();
+};
 
 const getAgentReturnTarget = () => `${window.location.pathname}${window.location.search}`;
 const defaultAgentModel = "Standard";
@@ -1094,6 +1096,7 @@ export default function AgentDock({ children }: AgentDockProps) {
   const [activeVcSessionId, setActiveVcSessionId] = useState<string | null>(null);
   const [vcCanvasInput, setVcCanvasInput] = useState("");
   const [vcForm, setVcForm] = useState<VCFormData>({ ...defaultVCForm });
+  const [vcProgressMsg, setVcProgressMsg] = useState<string>("");
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const activeConversation = useMemo(
@@ -1334,11 +1337,9 @@ export default function AgentDock({ children }: AgentDockProps) {
     try {
       const result = await api.agentChat({
         message: userText,
-        conversationId: activeConversationId,
-        model: defaultAgentModel,
-        attachments: currentAttachments,
-        references: currentReferences,
         messages: currentMessages,
+        conversationId: activeConversationId,
+        context: activeConversation,
       });
       setConversations((prev) =>
         prev.map((c) =>
@@ -1403,9 +1404,10 @@ export default function AgentDock({ children }: AgentDockProps) {
     setInput(`用「${candidate.title}」做一个 6 秒图生视频，风格参考：${candidate.style || "高级电商"}，提示词：${candidate.prompt}`);
   };
 
-  const runAction = (action: (typeof quickActions)[number]) => {
-    setInput(action.prompt);
+  const runAction = (action: any) => {
     setSkillMenuOpen(false);
+    setVcCanvasInput(action.prompt);
+    setInput(action.prompt);
   };
 
   // ── Video creation handlers ─────────────────────────────────────────────────
@@ -1431,13 +1433,27 @@ export default function AgentDock({ children }: AgentDockProps) {
     setVcLoading(true);
     setVcStage("outlining");
 
+    let currentConversationId = activeConversationId;
+    if (!activeConversation) {
+      const next: AgentConversation = {
+        id: Date.now(),
+        title: "新会话",
+        messages: [{ id: Date.now(), role: "agent", text: "你好！正在为你启动短视频生成..." }],
+        updatedAt: "刚刚",
+      };
+      setConversations((prev) => [next, ...prev]);
+      setActiveConversationId(next.id);
+      currentConversationId = next.id;
+    }
+
     const product = [...catalog].find((p) => p.id === vcForm.productId);
     const productName = product?.name ?? "商品";
     const videoTypeLabel = VIDEO_TYPES.find((t) => t.id === vcForm.videoType)?.label ?? vcForm.videoType;
     const styleLabel = vcForm.customStyle || (STYLE_PRESETS.find((s) => s.id === vcForm.style)?.label ?? vcForm.style);
 
     try {
-      const agentRes = await api.agentGenerate({
+      setVcProgressMsg("正在连接模型...");
+      const agentRes = await api.agentGenerateStream({
         productName,
         productDescription: (product as any)?.description || "",
         sellingPoints: (product as any)?.sellingPoints || [],
@@ -1446,10 +1462,12 @@ export default function AgentDock({ children }: AgentDockProps) {
         duration: parseInt(vcForm.duration) || 15,
         videoType: vcForm.videoType,
         userPrompt: vcForm.description
+      }, (msg, state) => {
+        if (msg) setVcProgressMsg(msg);
       });
 
       if (!agentRes.success || !agentRes.data) {
-        throw new Error(agentRes.message || "生成失败");
+        throw new Error("生成失败");
       }
 
       const generatedData = agentRes.data;
@@ -1457,9 +1475,9 @@ export default function AgentDock({ children }: AgentDockProps) {
       const beats = generatedData.storyboard?.map((s: any, idx: number) => ({
         id: s.shotId || `shot-${idx}`,
         order: idx,
-        heading: s.shotId || `Shot ${idx + 1}`,
-        timestamp: `${idx * parseInt(vcForm.duration) / generatedData.storyboard.length}s`,
-        description: s.picture || s.subtitle,
+        heading: s.scene || s.shotId || `Shot ${idx + 1}`,
+        timestamp: `${Math.round(idx * parseInt(vcForm.duration) / generatedData.storyboard.length)}s`,
+        description: s.visual || s.subtitle || "",
         duration: s.duration || 3,
         status: "pending" as const
       })) || getStoryBeats(vcForm.videoType); // Fallback to local if backend fails to return array
@@ -1497,11 +1515,10 @@ export default function AgentDock({ children }: AgentDockProps) {
       setVcLoading(false);
       setVcStage("canvas");
 
-      // Register this as a session
       const sessionId = `session-${Date.now()}`;
       const newSession: VCSession = {
         id: sessionId,
-        conversationId: activeConversationId,
+        conversationId: currentConversationId,
         title: projectData.title,
         videoType: vcForm.videoType,
         stage: "canvas",
@@ -1515,7 +1532,7 @@ export default function AgentDock({ children }: AgentDockProps) {
 
       setConversations((prev) =>
         prev.map((c) =>
-          c.id === activeConversationId
+          c.id === currentConversationId
             ? {
                 ...c,
                 title: `${productName} ${videoTypeLabel}`,
@@ -1668,27 +1685,50 @@ export default function AgentDock({ children }: AgentDockProps) {
               messages: [
                 ...c.messages,
                 { id: base, role: "user" as const, text },
-                { id: base + 1, role: "agent" as const, text: "好的，我来帮你调整分镜..." },
+                { id: base + 1, role: "agent" as const, text: "" },
               ],
             }
           : c,
       ),
     );
-    await new Promise((r) => setTimeout(r, 1200));
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeConversationId
-          ? {
-              ...c,
-              messages: c.messages.map((m) =>
-                m.id === base + 1
-                  ? { ...m, text: `已根据你的意见调整：「${text}」。你可以在右侧查看更新后的分镜描述，如果满意点击「开始生成」。` }
-                  : m,
-              ),
-            }
-          : c,
-      ),
-    );
+    
+    setAgentLoading(true);
+    try {
+      const messages = activeConversation?.messages.map(m => ({ role: m.role, content: m.text })) || [];
+      messages.push({ role: "user", content: text });
+      
+      const result = await api.agentChat({
+        message: text,
+        messages: messages,
+        conversationId: activeConversationId,
+        context: vcProject,
+      });
+      
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeConversationId
+            ? {
+                ...c,
+                messages: c.messages.map(m => m.id === base + 1 ? { ...m, text: result.reply } : m),
+              }
+            : c,
+        ),
+      );
+
+      // Apply changes if any
+      if (result.changes && result.changes.length > 0) {
+        // Find storyboard change
+        const sbChange = result.changes.find(c => c.type === "edit_storyboard" || c.target === "storyboard");
+        if (sbChange && sbChange.newText) {
+          try {
+            const newBeats = JSON.parse(sbChange.newText);
+            setVcProject((prev) => prev ? { ...prev, storyBeats: newBeats } : null);
+          } catch(e) {}
+        }
+      }
+    } finally {
+      setAgentLoading(false);
+    }
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -1700,7 +1740,7 @@ export default function AgentDock({ children }: AgentDockProps) {
     <div className={`agent-shell ${open ? "agent-shell-open" : ""}`}>
       <div className="agent-page-frame">{children}</div>
 
-      <main className={`agent-full-page ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} aria-hidden={!open}>
+      <main className={`agent-full-page ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} aria-hidden={!open ? "true" : undefined} style={{ pointerEvents: open ? "auto" : "none" }}>
 
         {/* ── COLLAPSIBLE LEFT SIDEBAR ──────────────────────────────────────── */}
         <aside className={`agent-history-sidebar ${sidebarCollapsed ? "agent-sidebar-collapsed" : ""}`} aria-label="Agent 会话历史">
@@ -1807,7 +1847,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                 /* Loading state */
                 <div className="vc-outlining-state">
                   <Loader2 size={32} className="vc-spin" style={{ color: "#4684EE", display: "block", margin: "0 auto 16px" }} />
-                  <p>正在分析商品信息，生成视频大纲...</p>
+                  <p>{vcProgressMsg || "正在分析商品信息，生成视频大纲..."}</p>
                 </div>
               ) : (
                 <VCInputBox
@@ -1871,50 +1911,9 @@ export default function AgentDock({ children }: AgentDockProps) {
 
             {/* Middle column: sessions list + agent chat */}
             <div className="agent-canvas-sessions-col">
-              {/* Header with new session button */}
-              <div className="agent-canvas-sessions-header">
-                <span className="agent-canvas-sessions-title">视频项目列表</span>
-                <button type="button" className="agent-canvas-new-session-btn" onClick={handleOpenVideoCreation} title="新建创作">
-                  <Plus size={15} />
-                </button>
-              </div>
-
-              {/* Sessions list */}
-              <div className="agent-canvas-sessions-list">
-                {vcSessions.map((session) => (
-                  <button
-                    key={session.id}
-                    type="button"
-                    className={`agent-canvas-session-item ${session.id === activeVcSessionId ? "active" : ""}`}
-                    onClick={() => {
-                      if (session.project) {
-                        setVcProject(session.project);
-                        setVcStage(session.stage);
-                        setActiveVcSessionId(session.id);
-                      }
-                    }}
-                  >
-                    <div className="agent-canvas-session-thumb">
-                      {session.thumbnail ? (
-                        <img src={session.thumbnail} alt={session.title} />
-                      ) : (
-                        <Film size={14} />
-                      )}
-                    </div>
-                    <div className="agent-canvas-session-info">
-                      <span className="agent-canvas-session-title">{session.title}</span>
-                      <span className={`agent-canvas-session-status ${session.stage === "generating" ? "generating" : session.stage === "preview" ? "done" : ""}`}>
-                        {stageLabel[session.stage]}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-                {vcSessions.length === 0 && (
-                  <div className="agent-canvas-sessions-empty">
-                    <Film size={20} />
-                    <span>当前无其他项目</span>
-                  </div>
-                )}
+              {/* Chat Session Context (Header) */}
+              <div className="agent-canvas-chat-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <span style={{ fontWeight: 500, color: "#1e293b" }}>{activeConversation?.title || "创作助手"}</span>
               </div>
 
               {/* Agent conversation thread */}
@@ -1968,7 +1967,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                   <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={() => setSkillMenuOpen(v => !v)}>
                     <Wrench size={19} />使用技能
                   </button>
-                  <button type="submit" disabled={agentLoading || !vcCanvasInput.trim()} className="agent-send-inline">
+                  <button type="submit" disabled={agentLoading || !vcCanvasInput.trim()} className="agent-send-inline" aria-label="发送消息" title="发送">
                     {agentLoading ? <Loader2 size={16} className="vc-spin" /> : <Send size={18} />}
                   </button>
 

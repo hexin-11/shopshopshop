@@ -219,16 +219,99 @@ export const api = {
     });
   },
 
+  async agentGenerateStream(payload: any, onProgress: (msg: string, state: any) => void) {
+    const submitResponse = await requestJson<{ success: boolean; data?: { taskId: string } }>("/api/task/submit", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    if (!submitResponse.data?.taskId) {
+      throw new Error("任务提交失败，未返回 taskId");
+    }
+
+    const taskId = submitResponse.data.taskId;
+
+    return new Promise((resolve, reject) => {
+      const interval = setInterval(async () => {
+        try {
+          const taskStatusRes = await requestJson<{ success: boolean; data?: any }>(`/api/task/status?taskId=${taskId}`);
+          const taskStatus = taskStatusRes.data;
+          
+          if (!taskStatus) return;
+
+          if (taskStatus.message) {
+            onProgress(taskStatus.message, taskStatus.result?.state || {});
+          }
+
+          if (taskStatus.status === "completed") {
+            clearInterval(interval);
+            resolve({ success: true, data: taskStatus.result?.finalState || taskStatus.result?.state });
+          } else if (taskStatus.status === "failed") {
+            clearInterval(interval);
+            reject(new Error(taskStatus.error || "生成失败"));
+          }
+        } catch (e) {
+          clearInterval(interval);
+          reject(e);
+        }
+      }, 1000); // 轮询间隔 1 秒
+    });
+  },
+
+  async agentChatStream(payload: { messages: any[], context: any }, onProgress: (msg: string, toolCall: any, toolResult: any) => void) {
+    const response = await fetch(buildPath("/api/agent/chat"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  
+    if (!response.body) throw new Error("No response body");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+  
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+  
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split(/\r?\n\r?\n/);
+      buffer = chunks.pop() || "";
+      
+      for (const chunk of chunks) {
+        if (!chunk.trim()) continue;
+        const typeMatch = chunk.match(/event:\s*(.*?)(?:\r?\n|$)/);
+        const dataMatch = chunk.match(/data:\s*(.*)(?:\r?\n|$)/);
+        if (typeMatch && dataMatch) {
+          const type = typeMatch[1].trim();
+          try {
+            const data = JSON.parse(dataMatch[1].trim());
+            if (type === "message") {
+              onProgress(data.text, null, null);
+            } else if (type === "tool_call") {
+              onProgress("", data.call, null);
+            } else if (type === "tool_result") {
+              onProgress("", null, data);
+            } else if (type === "error") {
+              throw new Error(data.message);
+            }
+          } catch(e) {
+            console.error("Parse error:", e, dataMatch[1]);
+          }
+        }
+      }
+    }
+    return { success: true };
+  },
+
   async agentConversations() {
     return requestJson<{ items: unknown[]; store?: string }>("/api/agent/conversations");
   },
 
   async agentGenerateClip(payload: Record<string, unknown>) {
     return requestJson<{
-      success: boolean;
       taskId?: string;
       message?: string;
-      code?: string;
     }>("/api/generate-clip", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -236,12 +319,6 @@ export const api = {
   },
 
   async agentGenerateClipStatus(taskId: string) {
-    return requestJson<{
-      success: boolean;
-      status?: string;
-      content?: any;
-      message?: string;
-      code?: string;
-    }>(`/api/generate-clip/status?taskId=${taskId}`);
+    return requestJson<any>(`/api/generate-clip/status?taskId=${taskId}`);
   },
 };

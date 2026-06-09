@@ -1,11 +1,14 @@
 import {
-  generateAgentController,
   generateScriptController,
   generateStoryboardController,
   generateVideoController,
   getTaskController,
   listMaterialsController,
   uploadMaterialController,
+  chatAgentController,
+  submitGenerationTaskController,
+  submitClipTaskController,
+  taskStatusController,
 } from "../controllers/aigcController.js";
 
 async function parseBody(req, readBody) {
@@ -68,13 +71,41 @@ export async function handleAigcRoutes({ req, res, pathname, searchParams, readB
     return execute(getTaskController, { taskId: taskMatch[1] });
   }
 
-  if (pathname === "/api/agent/generate" && req.method === "POST") {
+  if (pathname === "/api/task/submit" && req.method === "POST") {
     const body = await parseBody(req, readBody);
     if (body.__invalidJson) {
       sendJson(res, 400, { success: false, message: body.__invalidJson });
       return true;
     }
-    return execute(generateAgentController, { body });
+    return execute(submitGenerationTaskController, { body });
+  }
+
+  if (pathname === "/api/task/status" && req.method === "GET") {
+    return execute(taskStatusController, { searchParams });
+  }
+
+  if (pathname === "/api/generate-clip" && req.method === "POST") {
+    const body = await parseBody(req, readBody);
+    if (body.__invalidJson) {
+      sendJson(res, 400, { success: false, message: body.__invalidJson });
+      return true;
+    }
+    return execute(submitClipTaskController, { body });
+  }
+
+  if (pathname === "/api/generate-clip/status" && req.method === "GET") {
+    // Re-use task status controller for clips as well
+    return execute(taskStatusController, { searchParams });
+  }
+
+  if (pathname === "/api/agent/chat" && req.method === "POST") {
+    const body = await parseBody(req, readBody);
+    if (body.__invalidJson) {
+      sendJson(res, 400, { success: false, message: body.__invalidJson });
+      return true;
+    }
+    await chatAgentController({ body, req, res });
+    return true;
   }
 
   return false;
