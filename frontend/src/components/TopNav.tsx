@@ -72,7 +72,7 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
           : "border-b border-transparent bg-transparent",
       )}
     >
-      <div className="mx-auto flex h-[90px] max-w-[1440px] items-center px-8 lg:px-12">
+      <div className="mx-auto flex h-[90px] max-w-[1440px] items-center px-4 md:px-8 lg:px-12">
         <div className="flex w-0 flex-1 items-center gap-4">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

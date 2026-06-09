@@ -129,7 +129,7 @@ export default function VideoProjectsPage({ openProject }: { openProject: (id: s
                   )}
                 </div>
 
-                <div className="mt-5 grid grid-cols-3 gap-3 border-t border-neutral-100 pt-4">
+                <div className="mt-5 flex flex-wrap gap-x-6 gap-y-3 border-t border-neutral-100 pt-4">
                   <div>
                     <p className="text-xs text-neutral-400">播放</p>
                     <p className="mt-1 text-sm font-bold text-neutral-900">{work.views || "12.8K"}</p>
@@ -214,7 +214,7 @@ export default function VideoProjectsPage({ openProject }: { openProject: (id: s
                       <span className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-bold ${statusStyles[previewProject.workStatus] || statusStyles["草稿"]}`}>
                         {previewProject.workStatus}
                       </span>
-                      <div className="mt-6 grid grid-cols-3 gap-4">
+                      <div className="mt-6 flex flex-wrap gap-4">
                         {[
                           ["播放量", previewProject.views || "12.8K"],
                           ["转化率", previewProject.conversion || "3.4%"],

@@ -72,8 +72,8 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-3">
-          <div className="w-[160px]">
+        <div className="flex gap-3 w-full sm:w-auto">
+          <div className="flex-1 sm:w-[160px]">
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="h-[52px] bg-white font-medium text-[15px]" icon={<SlidersHorizontal />}>
                 <SelectValue placeholder="选择分类" />
@@ -85,7 +85,7 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[160px]">
+          <div className="flex-1 sm:w-[160px]">
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="h-[52px] bg-white font-medium text-[15px]" icon={<ArrowDownAZ />}>
                 <SelectValue placeholder="排序方式" />
@@ -157,7 +157,7 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
                       </span>
                     </div>
 
-                    <div className="mt-6 grid grid-cols-3 gap-3 border-t border-[#E5E7EB] pt-5 text-[13px] font-medium text-[#171719]/50">
+                    <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 border-t border-[#E5E7EB] pt-5 text-[13px] font-medium text-[#171719]/50">
                       <span>{product.assetCount} 素材</span>
                       <span>{product.projectCount} 作品</span>
                       <span className="truncate">{product.updatedAt}</span>
