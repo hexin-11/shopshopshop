@@ -35,7 +35,7 @@ export default function DashboardPage({
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 animate-fade-in">
-      <section className="grid gap-8 border-b border-neutral-200 pb-10 lg:grid-cols-[1.2fr_0.8fr]">
+      <section className="flex flex-col lg:grid lg:grid-cols-[1.2fr_0.8fr] gap-8 border-b border-neutral-200 pb-10">
         <div className="text-left">
           <p className="text-sm font-semibold text-neutral-500">TikFrame 工作台</p>
           <h1 className="mt-3 max-w-[720px] text-[34px] font-black leading-tight tracking-tight text-neutral-950">
@@ -88,7 +88,7 @@ export default function DashboardPage({
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-4 text-left lg:grid-cols-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left lg:grid-cols-4">
         {dashboard.metrics.map((metric) => (
           <button
             key={metric.label}
@@ -103,7 +103,7 @@ export default function DashboardPage({
       </section>
 
 
-      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+      <section className="flex flex-col lg:grid lg:grid-cols-[0.95fr_1.05fr] gap-6">
         <div className="rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-sm">
           <div className="mb-5 flex items-center justify-between">
             <div>

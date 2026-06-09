@@ -7,8 +7,34 @@
     <title>VibeGen AI</title>
     <script type="module" crossorigin src="/twick-studio/assets/index-BK67Im5O.js"></script>
     <link rel="stylesheet" crossorigin href="/twick-studio/assets/index-BRPCXR26.css">
+    <style>
+      @media (max-width: 767px) {
+        .render-container {
+          flex-direction: column !important;
+          height: auto !important;
+          padding: 10px !important;
+          gap: 12px !important;
+        }
+        .controls {
+          width: 100% !important;
+          min-width: 0 !important;
+          order: 2 !important;
+          padding: 16px !important;
+        }
+        .preview-container {
+          width: 100% !important;
+          height: 30vh !important;
+          min-height: 250px !important;
+          order: 1 !important;
+          padding: 12px !important;
+        }
+        .buttons, .buttons .file-button {
+          flex-direction: column !important;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>

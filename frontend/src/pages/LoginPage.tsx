@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Clapperboard, Film, Lock, Mail, Sparkles } from "lucide-react";
+import { Lock, Mail, Sparkles } from "lucide-react";
 
 interface LoginPageProps {
   navigate: (r: "dashboard") => void;
@@ -22,9 +22,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         <section className="relative hidden overflow-hidden bg-[#EAF4FF] p-12 lg:flex lg:flex-col lg:justify-between">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(70,132,238,0.26),transparent_32%),radial-gradient(circle_at_80%_70%,rgba(22,163,184,0.20),transparent_30%)]" />
           <div className="relative flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#4684EE] text-white shadow-[0_18px_40px_rgba(70,132,238,0.25)]">
-              <Film size={23} />
-            </div>
+            <img src="/logo.png" className="h-12 w-12 rounded-xl object-cover shadow-[0_18px_40px_rgba(70,132,238,0.25)]" alt="Logo" />
             <div>
               <div className="text-xl font-black tracking-tight">TikFrame AI</div>
               <div className="text-sm font-medium text-[#171719]/55">电商短视频创作工作台</div>
@@ -56,9 +54,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         <section className="flex items-center justify-center px-6 py-10">
           <div className="w-full max-w-[440px]">
             <div className="mb-10 flex items-center gap-3 lg:hidden">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4684EE] text-white">
-                <Clapperboard size={22} />
-              </div>
+              <img src="/logo.png" className="h-11 w-11 rounded-xl object-cover" alt="Logo" />
               <div className="text-xl font-black tracking-tight">TikFrame AI</div>
             </div>
 

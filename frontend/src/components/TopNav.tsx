@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, Settings, LogOut, ChevronDown, Clapperboard, X } from "lucide-react";
+import { Bell, Settings, LogOut, ChevronDown, Clapperboard, X, Menu } from "lucide-react";
 import type { RouteKey } from "../data/mockData";
 import { user as fallbackUser } from "../data/mockData";
 import { navItems } from "../lib/routes";
@@ -20,6 +20,7 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [trayOpen, setTrayOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [jobsList, setJobList] = useState<any[]>([]);
 
   useEffect(() => {
@@ -72,10 +73,16 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
       )}
     >
       <div className="mx-auto flex h-[90px] max-w-[1440px] items-center px-8 lg:px-12">
-        <div className="flex w-0 flex-1 items-center">
+        <div className="flex w-0 flex-1 items-center gap-4">
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden text-[#171719] hover:opacity-80 transition-opacity"
+          >
+            <Menu size={24} />
+          </button>
           <button
             onClick={() => navigate("dashboard")}
-            className="text-[24px] font-[900] tracking-[-0.03em] text-[#171719] transition-opacity hover:opacity-80"
+            className="text-[20px] md:text-[24px] font-[900] tracking-[-0.03em] text-[#171719] transition-opacity hover:opacity-80 truncate"
           >
             TikFrame AI
           </button>
@@ -154,6 +161,38 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
         </div>
       </div>
 
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="md:hidden border-b border-[#E5E7EB] bg-white overflow-hidden"
+          >
+            <nav className="flex flex-col py-2 px-6">
+              {navItems.map(({ key, label }) => {
+                const isActive = current === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      navigate(key);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={cn(
+                      "py-3 text-[16px] font-bold text-left transition-colors",
+                      isActive ? "text-[#4684EE]" : "text-[#171719]/70 hover:text-[#171719]"
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 全局任务托盘抽屉 */}
       <AnimatePresence>
         {trayOpen && (
@@ -170,7 +209,7 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed bottom-0 right-0 top-0 z-50 w-full max-w-[400px] border-l border-[#E5E7EB] bg-white p-6 shadow-2xl flex flex-col text-left"
+              className="fixed bottom-0 right-0 top-0 z-[60] w-full max-w-[400px] border-l border-[#E5E7EB] bg-white p-4 md:p-6 shadow-2xl flex flex-col text-left"
             >
               <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-4">
                 <div className="flex items-center gap-2">

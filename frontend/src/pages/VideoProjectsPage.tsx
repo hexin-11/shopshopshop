@@ -1,5 +1,6 @@
-import { CheckCircle2, Clapperboard, Download, Film, Lock, Play, Plus, Share2, SlidersHorizontal, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clapperboard, Download, Film, Lock, Play, Plus, Share2, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { projects } from "../data/mockData";
 import { api } from "../lib/api";
 import { AnimatePresence, motion } from "framer-motion";
@@ -168,79 +169,83 @@ export default function VideoProjectsPage({ openProject }: { openProject: (id: s
         </div>
       )}
 
-      <AnimatePresence>
-        {previewProject && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.36 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setPreviewProject(null)}
-              className="fixed inset-0 z-50 bg-neutral-950"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 14 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 14 }}
-              className="fixed left-1/2 top-1/2 z-50 w-[min(920px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-neutral-200 bg-white text-left shadow-2xl"
-            >
-              <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
-                <div className="min-w-0">
-                  <h3 className="truncate text-xl font-black text-neutral-950">{previewProject.name}</h3>
-                  <p className="mt-1 truncate text-sm text-neutral-500">
-                    {previewProject.product} · {previewProject.ratio} · {previewProject.updated}
-                  </p>
-                </div>
-                <button onClick={() => setPreviewProject(null)} className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700" aria-label="关闭预览">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="grid gap-0 md:grid-cols-[320px_1fr]">
-                <div className="bg-neutral-950 p-6">
-                  <video
-                    src="https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-sign-holding-headphones-40054-large.mp4"
-                    controls
-                    className="mx-auto aspect-[9/16] max-h-[520px] w-full rounded-xl object-cover"
-                    poster={previewProject.thumbnail}
-                  />
+      {createPortal(
+        <AnimatePresence>
+          {previewProject && (
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 md:p-6" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.6 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setPreviewProject(null)}
+                className="absolute inset-0 bg-neutral-950"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative w-full max-w-[800px] max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+              >
+                <div className="flex items-center justify-between border-b border-neutral-100 p-6 sticky top-0 bg-white z-10">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-xl font-black text-neutral-950">{previewProject.name}</h3>
+                    <p className="mt-1 truncate text-sm text-neutral-500">
+                      {previewProject.product} · {previewProject.ratio} · {previewProject.updated}
+                    </p>
+                  </div>
+                  <button onClick={() => setPreviewProject(null)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700" aria-label="返回">
+                    <ArrowLeft size={16} />
+                    返回
+                  </button>
                 </div>
 
-                <div className="flex flex-col justify-between p-6">
-                  <div>
-                    <span className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-bold ${statusStyles[previewProject.workStatus] || statusStyles["草稿"]}`}>
-                      {previewProject.workStatus}
-                    </span>
-                    <div className="mt-6 grid grid-cols-3 gap-4">
-                      {[
-                        ["播放量", previewProject.views || "12.8K"],
-                        ["转化率", previewProject.conversion || "3.4%"],
-                        ["渠道", previewProject.channel],
-                      ].map(([label, value]) => (
-                        <div key={label} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-                          <p className="text-xs font-medium text-neutral-500">{label}</p>
-                          <p className="mt-2 text-lg font-black text-neutral-950">{value}</p>
-                        </div>
-                      ))}
+                <div className="grid gap-0 md:grid-cols-[320px_1fr]">
+                  <div className="bg-neutral-950 p-6">
+                    <video
+                      src="https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-sign-holding-headphones-40054-large.mp4"
+                      controls
+                      className="mx-auto aspect-[9/16] max-h-[520px] w-full rounded-xl object-cover"
+                      poster={previewProject.thumbnail}
+                    />
+                  </div>
+
+                  <div className="flex flex-col justify-between p-6">
+                    <div>
+                      <span className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-bold ${statusStyles[previewProject.workStatus] || statusStyles["草稿"]}`}>
+                        {previewProject.workStatus}
+                      </span>
+                      <div className="mt-6 grid grid-cols-3 gap-4">
+                        {[
+                          ["播放量", previewProject.views || "12.8K"],
+                          ["转化率", previewProject.conversion || "3.4%"],
+                          ["渠道", previewProject.channel],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                            <p className="text-xs font-medium text-neutral-500">{label}</p>
+                            <p className="mt-2 text-lg font-black text-neutral-950">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-8 space-y-2">
+                      <button className="btn-primary w-full justify-center">
+                        <Download size={18} />
+                        下载 MP4
+                      </button>
+                      <button onClick={() => openProject(previewProject.id)} className="btn-secondary w-full justify-center">
+                        <CheckCircle2 size={18} />
+                        进入精剪
+                      </button>
                     </div>
                   </div>
-
-                  <div className="mt-8 space-y-2">
-                    <button className="btn-primary w-full justify-center">
-                      <Download size={18} />
-                      下载 MP4
-                    </button>
-                    <button onClick={() => openProject(previewProject.id)} className="btn-secondary w-full justify-center">
-                      <CheckCircle2 size={18} />
-                      进入精剪
-                    </button>
-                  </div>
                 </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
