@@ -29,7 +29,7 @@ import {
   Zap,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { catalog } from "../data/mockData";
+import { catalog, productScripts } from "../data/mockData";
 
 // ── Existing types ────────────────────────────────────────────────────────────
 
@@ -101,6 +101,11 @@ interface VCFormData {
   aspectRatio: string;
   duration: string;
   resolution: string;
+  frameRate: string;
+  generationCount: string;
+  seed: string;
+  negativePrompt: string;
+  referenceWeight: string;
   references: string[];
 }
 
@@ -130,6 +135,11 @@ interface VideoProjectData {
   aspectRatio: string;
   duration: string;
   resolution: string;
+  frameRate?: string;
+  generationCount?: string;
+  seed?: string;
+  negativePrompt?: string;
+  referenceWeight?: string;
   storyBeats: StoryBeat[];
   visualRefs: VisualRef[];
     avatar?: string;
@@ -210,6 +220,18 @@ const RESOLUTIONS_MAP = [
   { id: "2k", label: "2K" },
 ];
 
+const FRAME_RATES = [
+  { id: "24", label: "24 fps" },
+  { id: "30", label: "30 fps" },
+  { id: "60", label: "60 fps" },
+];
+
+const GENERATION_COUNTS = [
+  { id: "1", label: "1 个" },
+  { id: "2", label: "2 个" },
+  { id: "4", label: "4 个" },
+];
+
 const defaultVCForm: VCFormData = {
   productId: "",
   description: "",
@@ -219,6 +241,11 @@ const defaultVCForm: VCFormData = {
   aspectRatio: "9:16",
   duration: "30",
   resolution: "1080p",
+  frameRate: "30",
+  generationCount: "1",
+  seed: "",
+  negativePrompt: "",
+  referenceWeight: "0.65",
   references: [],
 };
 
@@ -357,12 +384,6 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
           setShowProductList(false);
         }
       }
-      
-      const skillMenu = document.querySelector('.agent-skill-menu');
-      const skillBtn = document.querySelector('.agent-skill-button');
-      if (skillMenuOpen && onSkillClick && skillMenu && !skillMenu.contains(e.target as Node) && skillBtn && !skillBtn.contains(e.target as Node)) {
-        onSkillClick(); // toggles it off
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -372,7 +393,7 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
     <div className={`vc-input-pill-container ${expanded ? "vc-input-expanded" : ""}`} style={{position: 'relative', width: '100%', maxWidth: '900px', margin: '0 auto'}}>
       
       {/* 1. THE PILL FORM */}
-      <form className="agent-search-pill" onSubmit={(e) => { e.preventDefault(); onSubmit(); }} style={{margin: 0, width: '100%', overflow: 'hidden', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'}}>
+      <form className="agent-search-pill" onSubmit={(e) => { e.preventDefault(); onSubmit(); }} style={{margin: 0, width: '100%', overflow: 'visible', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'}}>
         <textarea
           value={form.description}
           onChange={(e) => set("description", e.target.value)}
@@ -412,7 +433,7 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
         
         {/* SKILLS DROPDOWN */}
         {skillMenuOpen && quickActions && runAction && (
-          <div className="agent-skill-menu" style={{bottom: '60px'}}>
+          <div className="agent-skill-menu" onMouseDown={(e) => e.stopPropagation()}>
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
@@ -455,19 +476,50 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5, marginLeft: "auto" }}><path d="m6 9 6 6 6-6" /></svg>
               </button>
               {showProductList && (
-                <div className="vc-product-list" style={{boxShadow: '0 8px 24px rgba(0,0,0,0.1)', border: '1px solid #eee'}}>
-                  {[...catalog].map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={form.productId === p.id ? "active" : ""}
-                      onClick={() => { set("productId", p.id); setShowProductList(false); }}
-                    >
-                      {p.mainImage && <img src={p.mainImage} alt={p.name} style={{width: 32, height: 32, borderRadius: 6}} />}
-                      <span style={{ flex: 1 }}>{p.name}</span>
-                      {form.productId === p.id && <Check size={16} />}
-                    </button>
-                  ))}
+                <div className="vc-product-list vc-product-card-list vc-product-panel-list" style={{boxShadow: '0 8px 24px rgba(0,0,0,0.1)', border: '1px solid #eee'}}>
+                  {[...catalog].map((p) => {
+                    const sellingPoint = productScripts[p.id]?.[0]?.content?.[1]?.body ?? `${p.category}商品，已整理可用于视频生成的商品素材。`;
+                    return (
+                      <div key={p.id} className={`vc-product-card-option ${form.productId === p.id ? "active" : ""}`}>
+                        {p.mainImage && <img src={p.mainImage} alt={p.name} />}
+                        <div className="vc-product-card-info">
+                          <strong>{p.name}</strong>
+                          <span>{p.category}</span>
+                          <small>{sellingPoint}</small>
+                          <em>{p.assetCount} 个素材</em>
+                        </div>
+                        <div className="vc-product-card-actions">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              window.history.pushState({}, "", `/products/${p.id}`);
+                              window.dispatchEvent(new PopStateEvent("popstate"));
+                              setShowProductList(false);
+                            }}
+                          >
+                            编辑
+                          </button>
+                          <button
+                            type="button"
+                            className="primary"
+                            onClick={() => { set("productId", p.id); setShowProductList(false); }}
+                          >
+                            {form.productId === p.id ? "已选" : "选择"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    className="vc-product-add-entry"
+                    onClick={() => {
+                      setShowProductList(false);
+                      setShowAddProduct(true);
+                    }}
+                  >
+                    + 添加商品
+                  </button>
                 </div>
               )}
             </div>
@@ -495,18 +547,24 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
               <div className="vc-pill-row">
                 {VIDEO_TYPES.map((t) => (
-                  <button key={t.id} type="button" className={`vc-pill ${form.videoType === t.id ? "active" : ""}`} onClick={() => set("videoType", t.id)}>
+                  <button key={t.id} type="button" className={`vc-pill ${form.videoType === t.id ? "active" : ""}`} onClick={() => onFormChange({ ...form, videoType: t.id, style: form.style === "custom" ? "" : form.style })}>
                     {t.label}
                   </button>
                 ))}
               </div>
               <div className="vc-pill-row">
                 {STYLE_PRESETS.map((s) => (
-                  <button key={s.id} type="button" className={`vc-pill ${form.style === s.id && !form.customStyle ? "active" : ""}`} onClick={() => { onFormChange({ ...form, style: s.id, customStyle: "" }); }}>
+                  <button key={s.id} type="button" className={`vc-pill ${form.style === s.id ? "active" : ""}`} onClick={() => { onFormChange({ ...form, style: s.id, customStyle: "" }); }}>
                     {s.label}
                   </button>
                 ))}
-                <input className={`vc-pill vc-pill-input ${form.customStyle ? "active" : ""}`} placeholder="自定义风格..." value={form.customStyle} onChange={(e) => onFormChange({ ...form, customStyle: e.target.value, style: "custom" })} />
+                <input
+                  className={`vc-pill vc-pill-input ${form.style === "custom" ? "active" : ""}`}
+                  placeholder="自定义风格..."
+                  value={form.customStyle}
+                  onFocus={() => onFormChange({ ...form, videoType: "", style: "custom" })}
+                  onChange={(e) => onFormChange({ ...form, videoType: "", customStyle: e.target.value, style: "custom" })}
+                />
               </div>
             </div>
           </div>
@@ -516,27 +574,56 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
           {/* Parameters */}
           <div className="vc-expand-row">
             <span className="vc-expand-label">参数设置</span>
-            <div className="vc-pill-row" style={{flex: 1}}>
-              <div className="vc-dropdown-wrapper">
+            <div className="vc-param-grid">
+              <label className="vc-param-field">
+                <span>视频比例</span>
                 <select className="vc-custom-select" value={form.aspectRatio} onChange={(e) => set("aspectRatio", e.target.value)}>
                   {ASPECT_RATIOS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
                 </select>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
-              </div>
+              </label>
               
-              <div className="vc-dropdown-wrapper">
+              <label className="vc-param-field">
+                <span>时长</span>
                 <select className="vc-custom-select" value={form.duration} onChange={(e) => set("duration", e.target.value)}>
                   {DURATIONS_MAP.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
                 </select>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
-              </div>
+              </label>
 
-              <div className="vc-dropdown-wrapper">
+              <label className="vc-param-field">
+                <span>分辨率</span>
                 <select className="vc-custom-select" value={form.resolution} onChange={(e) => set("resolution", e.target.value)}>
                   {RESOLUTIONS_MAP.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
                 </select>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
-              </div>
+              </label>
+
+              <label className="vc-param-field">
+                <span>帧率</span>
+                <select className="vc-custom-select" value={form.frameRate} onChange={(e) => set("frameRate", e.target.value)}>
+                  {FRAME_RATES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+              </label>
+
+              <label className="vc-param-field">
+                <span>生成数量</span>
+                <select className="vc-custom-select" value={form.generationCount} onChange={(e) => set("generationCount", e.target.value)}>
+                  {GENERATION_COUNTS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+              </label>
+
+              <label className="vc-param-field">
+                <span>随机种子</span>
+                <input className="vc-custom-select" value={form.seed} placeholder="自动" onChange={(e) => set("seed", e.target.value)} />
+              </label>
+
+              <label className="vc-param-field vc-param-wide">
+                <span>负面提示词</span>
+                <input className="vc-custom-select" value={form.negativePrompt} placeholder="如：模糊、低清、畸变" onChange={(e) => set("negativePrompt", e.target.value)} />
+              </label>
+
+              <label className="vc-param-field">
+                <span>参考素材权重</span>
+                <input className="vc-custom-select" type="number" min="0" max="1" step="0.05" value={form.referenceWeight} onChange={(e) => set("referenceWeight", e.target.value)} />
+              </label>
             </div>
           </div>
         </div>
@@ -755,6 +842,8 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
         <span className="vc-canvas-chip">{project.aspectRatio}</span>
         <span className="vc-canvas-chip">~{project.duration}s</span>
         <span className="vc-canvas-chip">{project.resolution}</span>
+        {project.frameRate && <span className="vc-canvas-chip">{project.frameRate}fps</span>}
+        {project.generationCount && <span className="vc-canvas-chip">{project.generationCount} 个结果</span>}
         <span className="vc-canvas-chip">
           {STYLE_PRESETS.find((s) => s.id === project.style)?.label || project.style}
         </span>
@@ -762,6 +851,27 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
           {VIDEO_TYPES.find((t) => t.id === project.videoType)?.label || project.videoType}
         </span>
       </div>
+
+      {onUpdateProject && isCanvas && (
+        <div className="vc-canvas-edit-row">
+          <label>
+            <span>视频类型</span>
+            <select value={project.videoType} onChange={(e) => onUpdateProject({ videoType: e.target.value })}>
+              {VIDEO_TYPES.map((type) => (
+                <option key={type.id} value={type.id}>{type.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>视频风格</span>
+            <select value={project.style} onChange={(e) => onUpdateProject({ style: e.target.value })}>
+              {STYLE_PRESETS.map((style) => (
+                <option key={style.id} value={style.id}>{style.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {/* Visual References */}
       <div className="vc-canvas-section">
@@ -928,6 +1038,24 @@ export default function AgentDock({ children }: AgentDockProps) {
     }
   }, [videoCreationMode, vcStage]);
 
+  useEffect(() => {
+    if (!skillMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const menus = Array.from(document.querySelectorAll(".agent-skill-menu"));
+      const buttons = Array.from(document.querySelectorAll(".agent-skill-button"));
+      const clickedInside = [...menus, ...buttons].some((node) => node.contains(target));
+
+      if (!clickedInside) {
+        setSkillMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [skillMenuOpen]);
+
   // ── Effects ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -1015,6 +1143,19 @@ export default function AgentDock({ children }: AgentDockProps) {
     window.history.replaceState({}, "", target);
     window.dispatchEvent(new PopStateEvent("popstate"));
     setOpen(false);
+  };
+
+  const goToPreviousAgentStep = () => {
+    setSkillMenuOpen(false);
+
+    if (vcStage === "storyboard") {
+      setVcStage("canvas");
+      return;
+    }
+
+    if (vcStage === "canvas" || vcStage === "outlining") {
+      setVcStage("setup");
+    }
   };
 
   const startNewConversation = () => {
@@ -1230,6 +1371,11 @@ export default function AgentDock({ children }: AgentDockProps) {
       aspectRatio: vcForm.aspectRatio,
       duration: vcForm.duration,
       resolution: vcForm.resolution,
+      frameRate: vcForm.frameRate,
+      generationCount: vcForm.generationCount,
+      seed: vcForm.seed,
+      negativePrompt: vcForm.negativePrompt,
+      referenceWeight: vcForm.referenceWeight,
       storyBeats: beats,
       visualRefs,
     };
@@ -1453,15 +1599,6 @@ export default function AgentDock({ children }: AgentDockProps) {
           {/* Sidebar content (hidden when collapsed) */}
           {!sidebarCollapsed && (
             <>
-              <div className="agent-sidebar-library" aria-label="资产库">
-                <strong>资产库</strong>
-                {libraryItems.map((item) => (
-                  <button type="button" key={item.id} onClick={() => addLibraryItem(item)}>
-                    <span>{item.title}</span>
-                    <small>{item.type} · {item.detail}</small>
-                  </button>
-                ))}
-              </div>
               <div className="agent-history-list">
                 {sortedConversations.map((conv) => (
                   <div
@@ -1511,8 +1648,15 @@ export default function AgentDock({ children }: AgentDockProps) {
         {/* Top-right back button */}
         <button type="button" className="agent-top-back" onClick={returnToPreviousPage}>
           <ArrowLeft size={18} />
-          返回
+          退出
         </button>
+
+        {videoCreationMode && vcStage !== "setup" && (
+          <button type="button" className="agent-step-back" onClick={goToPreviousAgentStep}>
+            <ChevronLeft size={18} />
+            上一步
+          </button>
+        )}
 
         {/* ── SETUP MODE: expanding chat input ─────────────────────────────── */}
         {videoCreationMode && (vcStage === "setup" || vcStage === "outlining") && (
@@ -1692,7 +1836,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                   </button>
 
                   {skillMenuOpen && (
-                    <div className="agent-skill-menu" style={{bottom: '60px', left: 0, right: 'auto'}}>
+                    <div className="agent-skill-menu" onMouseDown={(e) => e.stopPropagation()}>
                       {quickActions.map((action) => {
                         const Icon = action.icon;
                         return (
@@ -1876,7 +2020,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                 <Send size={18} />
               </button>
               {skillMenuOpen && (
-                <div className="agent-skill-menu">
+                <div className="agent-skill-menu" onMouseDown={(e) => e.stopPropagation()}>
                   {quickActions.map((action) => {
                     const Icon = action.icon;
                     return (

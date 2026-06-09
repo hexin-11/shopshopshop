@@ -146,7 +146,7 @@ export default function ProductsPage({ onSelectProduct }: { onSelectProduct: (id
                         <p className="truncate text-[18px] font-bold text-[#171719]">{product.name}</p>
                         <p className="mt-1 text-[14px] text-[#171719]/50">{product.brand}</p>
                       </div>
-                      <span className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold ${productStatusClass[status] || productStatusClass["资料待补全"]}`}>
+                      <span className={`sr-only ${productStatusClass[status] || productStatusClass["资料待补全"]}`}>
                         {status}
                       </span>
                     </div>
