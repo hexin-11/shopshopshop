@@ -249,18 +249,18 @@ export default function ProductDetailPage({
         <div className="flex items-start gap-4">
           <button
             onClick={onBack}
-            className="btn-ghost mt-2 p-2 hover:bg-neutral-100 rounded-full transition-colors"
+            className="btn-ghost md:mt-2 p-2 hover:bg-neutral-100 rounded-full transition-colors shrink-0"
             aria-label="返回"
           >
             <ArrowLeft size={20} />
           </button>
-          <div>
+          <div className="min-w-0">
             <p className="text-[14px] font-medium text-neutral-400 mb-1">
               商品库 <span className="mx-2 text-neutral-200">/</span>
               <span className="text-neutral-800">{localProduct.name}</span>
             </p>
-            <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight">{localProduct.name}</h1>
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mt-1">
+              <h1 className="text-2xl md:text-3xl font-extrabold text-neutral-900 tracking-tight truncate">{localProduct.name}</h1>
               <EditProductDialog 
                 initialData={{ name: localProduct.name, brand: localProduct.brand, category: localProduct.category, details: localProduct.details }}
                 onSave={(data) => setLocalProduct({ ...localProduct, ...data })}
@@ -275,14 +275,16 @@ export default function ProductDetailPage({
           </div>
         </div>
 
-        <button onClick={handleCreateVideo} className="btn-primary shrink-0 shadow-sm">
-          <Zap size={18} />
-          AI 创作视频
-        </button>
+        <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white p-4 border-t border-[#E5E7EB] md:static md:bg-transparent md:p-0 md:border-0">
+          <button onClick={handleCreateVideo} className="btn-primary w-full md:w-auto shrink-0 shadow-sm justify-center h-12 md:h-auto text-base md:text-sm">
+            <Zap size={18} />
+            AI 创作视频
+          </button>
+        </div>
       </div>
 
       {/* 左右分栏布局 */}
-      <div className="grid lg:grid-cols-[320px_1fr] gap-8 mt-4 items-start">
+      <div className="flex flex-col lg:grid lg:grid-cols-[320px_1fr] gap-8 mt-4 items-start">
         
         {/* 左侧固定信息栏 */}
         <div className="flex flex-col gap-6 sticky top-8">
@@ -567,7 +569,7 @@ export default function ProductDetailPage({
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 20 }}
-                        className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-neutral-900 text-white pl-6 pr-2 py-2 rounded-full shadow-2xl flex items-center gap-6 z-50 whitespace-nowrap"
+                        className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 bg-neutral-900 text-white pl-6 pr-2 py-2 rounded-full shadow-2xl flex items-center gap-6 z-50 whitespace-nowrap"
                       >
                         <span className="text-sm font-medium shrink-0">已选择 {selectedAssets.size} 个素材</span>
                         <div className="w-px h-4 bg-neutral-700 shrink-0"></div>

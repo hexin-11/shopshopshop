@@ -118,8 +118,9 @@ interface StoryBeat {
   subtitle?: string;
   voiceover?: string;
   duration: number;
-  status: "pending" | "generating" | "done" | "failed";
-  videoClipUrl?: string;
+  status: "pending" | "generating" | "done" | "generated" | "mock_ready" | "failed";
+  videoClipUrl?: string;   // 只有真实 http/https 视频才存这里
+  errorMessage?: string;   // failed 时的错误原因
 }
 
 interface VisualRef {
@@ -312,6 +313,14 @@ const stageLabel: Record<VideoCreationStage, string> = {
 };
 
 // ── Utility ───────────────────────────────────────────────────────────────────
+
+/**
+ * 只有 http/https 开头的真实 URL 才能渲染 video 播放器
+ * mock 路径（/uploads/mock/...）或 picsum 图片都不算真实视频
+ */
+function isPlayableVideoUrl(url?: string): boolean {
+  return typeof url === 'string' && /^https?:\/\//.test(url);
+}
 
 const createConversation = (): Conversation => {
   const id = Date.now();
@@ -759,17 +768,25 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
           >
             {/* Thumbnail */}
             <div className="vc-shot-thumb">
-              {beat.videoClipUrl ? (
-                <>
-                  <video src={beat.videoClipUrl} controls autoPlay loop style={{width: "100%", height: "100%", objectFit: "cover"}} />
-                </>
+              {isPlayableVideoUrl(beat.videoClipUrl) ? (
+                <video src={beat.videoClipUrl} controls autoPlay loop style={{width: "100%", height: "100%", objectFit: "cover"}} />
+              ) : beat.status === "generating" ? (
+                <div className="vc-shot-placeholder">
+                  <Loader2 size={22} className="vc-spin" style={{ color: "#4684EE" }} />
+                </div>
+              ) : beat.status === "mock_ready" || beat.status === "done" ? (
+                <div className="vc-shot-placeholder" style={{ flexDirection: 'column', gap: 6 }}>
+                  <Film size={20} style={{ color: "#94a3b8" }} />
+                  <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>模拟素材</span>
+                </div>
+              ) : beat.status === "failed" ? (
+                <div className="vc-shot-placeholder" style={{ flexDirection: 'column', gap: 6 }}>
+                  <span style={{ fontSize: 11, color: "#ef4444", fontWeight: 600 }}>生成失败</span>
+                  {beat.errorMessage && <span style={{ fontSize: 10, color: "#ef4444", textAlign: 'center', padding: '0 8px' }}>{beat.errorMessage}</span>}
+                </div>
               ) : (
                 <div className="vc-shot-placeholder">
-                  {beat.status === "generating" ? (
-                    <Loader2 size={22} className="vc-spin" style={{ color: "#4684EE" }} />
-                  ) : (
-                    <Film size={22} />
-                  )}
+                  <Film size={22} />
                 </div>
               )}
             </div>
@@ -1097,6 +1114,7 @@ export default function AgentDock({ children }: AgentDockProps) {
   const [vcCanvasInput, setVcCanvasInput] = useState("");
   const [vcForm, setVcForm] = useState<VCFormData>({ ...defaultVCForm });
   const [vcProgressMsg, setVcProgressMsg] = useState<string>("");
+  const [outlineError, setOutlineError] = useState<string | null>(null);
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const activeConversation = useMemo(
@@ -1422,6 +1440,7 @@ export default function AgentDock({ children }: AgentDockProps) {
     setVcStage("setup");
     setVcProject(null);
     setVcLoading(false);
+    setOutlineError(null);
     setVcInputExpanded(false);
     setInput("");
     setAttachments([]);
@@ -1430,6 +1449,7 @@ export default function AgentDock({ children }: AgentDockProps) {
 
   const handleVCFormSubmit = async () => {
     if (!vcForm.description.trim()) return;
+    setOutlineError(null);
     setVcLoading(true);
     setVcStage("outlining");
 
@@ -1552,6 +1572,8 @@ export default function AgentDock({ children }: AgentDockProps) {
     } catch (e: any) {
       console.error(e);
       setVcLoading(false);
+      setVcStage("setup");
+      setOutlineError(e.message || "未知错误");
       setConversations((prev) =>
         prev.map((c) =>
           c.id === activeConversationId
@@ -1606,17 +1628,26 @@ export default function AgentDock({ children }: AgentDockProps) {
     setVcStage("generating");
 
     for (const beat of vcProject.storyBeats) {
-      setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beat.id ? { ...b, status: "generating" } : b)) } : null);
+      setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beat.id ? { ...b, status: "generating", videoClipUrl: undefined } : b)) } : null);
       
       const imageUrl = vcProject.visualRefs?.[0]?.url || "";
       const videoUrl = await generateClip(beat.description, imageUrl, vcProject.aspectRatio, parseInt(vcProject.duration) || 5);
+      
+      // 只有真实 http/https URL 才能当视频播放
+      const isRealVideo = isPlayableVideoUrl(videoUrl);
       
       setVcProject((prev) =>
         prev ? {
           ...prev,
           storyBeats: prev.storyBeats.map((b) =>
             b.id === beat.id
-              ? { ...b, status: "done", videoClipUrl: videoUrl || `https://picsum.photos/seed/${beat.id}${Date.now()}/320/568` }
+              ? {
+                  ...b,
+                  // generated: 真实视频已生成; mock_ready: mock 模式下暂无真实视频
+                  status: isRealVideo ? "generated" : "mock_ready",
+                  // 只有真实视频才设置 videoClipUrl，mock 路径不设置
+                  videoClipUrl: isRealVideo ? (videoUrl as string) : undefined,
+                }
               : b
           )
         } : null
@@ -1632,7 +1663,7 @@ export default function AgentDock({ children }: AgentDockProps) {
               updatedAt: "刚刚",
               messages: [
                 ...c.messages,
-                { id: Date.now(), role: "agent" as const, text: `🎬 视频片段生成完成！${vcProject.storyBeats.length} 个分镜全部就绪。现在进入粗略分镜调整，你可以重排、删减或单独重新生成不满意的镜头，确认后进入精剪。` },
+                { id: Date.now(), role: "agent" as const, text: `🎬 分镜规划完成！${vcProject.storyBeats.length} 个分镜已就绪。当前为 ARK_MOCK=true 模拟模式，分镜展示为占位素材。如需生成真实视频，请配置 ARK_API_KEY 并关闭 mock 模式。你可以继续调整分镜描述，确认后进入精剪。` },
               ],
             }
           : c,
@@ -1642,20 +1673,25 @@ export default function AgentDock({ children }: AgentDockProps) {
 
   const handleRegenerateBeat = async (beatId: string) => {
     if (!vcProject) return;
-    setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beatId ? { ...b, status: "generating", videoClipUrl: undefined } : b)) } : null);
+    setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beatId ? { ...b, status: "generating", videoClipUrl: undefined, errorMessage: undefined } : b)) } : null);
     
     const beat = vcProject.storyBeats.find(b => b.id === beatId);
     if (!beat) return;
     
     const imageUrl = vcProject.visualRefs?.[0]?.url || "";
     const videoUrl = await generateClip(beat.description, imageUrl, vcProject.aspectRatio, parseInt(vcProject.duration) || 5);
+    const isRealVideo = isPlayableVideoUrl(videoUrl);
     
     setVcProject((prev) =>
       prev ? {
           ...prev,
           storyBeats: prev.storyBeats.map((b) =>
             b.id === beatId
-              ? { ...b, status: "done", videoClipUrl: videoUrl || `https://picsum.photos/seed/${beatId}regen${Date.now()}/320/568` }
+              ? {
+                  ...b,
+                  status: isRealVideo ? "generated" : "mock_ready",
+                  videoClipUrl: isRealVideo ? (videoUrl as string) : undefined,
+                }
               : b
           )
         } : null
@@ -1844,6 +1880,22 @@ export default function AgentDock({ children }: AgentDockProps) {
             <div className="vc-home-center">
               <h1 className="vc-home-title">AI 创作视频</h1>
               <p className="vc-home-sub">描述你想制作的视频，或选择商品直接开始</p>
+
+              {outlineError && (
+                <div className="vc-error-banner" style={{
+                  background: "rgba(239, 68, 68, 0.1)",
+                  border: "1px solid rgba(239, 68, 68, 0.2)",
+                  color: "#ef4444",
+                  padding: "12px 16px",
+                  borderRadius: "8px",
+                  marginBottom: "20px",
+                  fontSize: "13px",
+                  lineHeight: "1.4",
+                  textAlign: "left"
+                }}>
+                  <strong>生成失败：</strong>{outlineError}
+                </div>
+              )}
 
               {vcStage === "outlining" ? (
                 /* Loading state */

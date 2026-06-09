@@ -11,9 +11,9 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children, current, navigate, onLogout }: AppLayoutProps) {
   return (
-    <div className="min-h-screen bg-white text-[#171719]">
+    <div className="min-h-screen bg-white text-[#171719] overflow-x-hidden">
       <TopNav current={current} navigate={navigate} onLogout={onLogout} />
-      <main className="mx-auto w-full max-w-[1440px] px-8 py-16 lg:px-12">
+      <main className="mx-auto w-full max-w-[1440px] px-4 md:px-8 lg:px-12 py-8 lg:py-16">
         {children}
       </main>
     </div>

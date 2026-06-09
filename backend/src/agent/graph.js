@@ -1,17 +1,15 @@
-import { StateGraph, END, START } from "@langchain/langgraph";
-import { AgentState } from "./state.js";
-import { 
-  analyzeIntentNode, 
-  chatNode, 
-  scriptGenerationNode, 
-  videoAnalysisNode, 
-  editPlanNode 
+// 轻量级 intent 路由，替换 LangGraph StateGraph
+// 去除 @langchain/langgraph 和 @langchain/openai 依赖，避免 OPENAI_API_KEY 报错
+
+import {
+  analyzeIntentNode,
+  chatNode,
+  scriptGenerationNode,
+  videoAnalysisNode,
+  editPlanNode,
 } from "./nodes.js";
 
-// ====== 路由判断 ======
-
-function routeByIntent(state) {
-  const { intent } = state;
+function routeByIntent(intent) {
   switch (intent) {
     case "analyze":
       return "analyze_video";
@@ -19,7 +17,6 @@ function routeByIntent(state) {
       return "generate_script";
     case "edit":
       return "edit_plan";
-    // 简化起见，image/video 在这里先统一走到 chat，可以后续扩展
     case "chat":
     case "image":
     case "video":
@@ -28,30 +25,36 @@ function routeByIntent(state) {
   }
 }
 
-// ====== 构建图 ======
+/**
+ * 轻量级 Agent Graph，不依赖 LangGraph
+ * 完全通过 arkClient.js 执行 LLM 调用
+ */
+export const agentGraph = {
+  async invoke(initialState) {
+    // Step 1: 分析意图
+    const intentResult = await analyzeIntentNode(initialState);
+    const state = { ...initialState, ...intentResult };
 
-const workflow = new StateGraph(AgentState)
-  // 添加节点
-  .addNode("intent_router", analyzeIntentNode)
-  .addNode("chat_fallback", chatNode)
-  .addNode("generate_script", scriptGenerationNode)
-  .addNode("analyze_video", videoAnalysisNode)
-  .addNode("edit_plan", editPlanNode)
-  
-  // 添加边
-  .addEdge(START, "intent_router")
-  .addConditionalEdges("intent_router", routeByIntent, {
-    "analyze_video": "analyze_video",
-    "generate_script": "generate_script",
-    "edit_plan": "edit_plan",
-    "chat_fallback": "chat_fallback"
-  })
-  
-  // 所有叶子节点结束
-  .addEdge("analyze_video", END)
-  .addEdge("generate_script", END)
-  .addEdge("edit_plan", END)
-  .addEdge("chat_fallback", END);
+    // Step 2: 根据意图路由到对应节点
+    const route = routeByIntent(state.intent);
 
-// 编译图
-export const agentGraph = workflow.compile();
+    let nodeResult;
+    switch (route) {
+      case "analyze_video":
+        nodeResult = await videoAnalysisNode(state);
+        break;
+      case "generate_script":
+        nodeResult = await scriptGenerationNode(state);
+        break;
+      case "edit_plan":
+        nodeResult = await editPlanNode(state);
+        break;
+      case "chat_fallback":
+      default:
+        nodeResult = await chatNode(state);
+        break;
+    }
+
+    return { ...state, ...nodeResult, trace: state.trace || [] };
+  },
+};
