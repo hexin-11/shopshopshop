@@ -187,6 +187,7 @@ export const api = {
       }>;
       provider?: string;
       model?: string;
+      trace?: any[];
       conversation?: unknown;
     }>("/api/agent/chat", {
       method: "POST",

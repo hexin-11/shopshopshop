@@ -1,4 +1,20 @@
 import { agentGraph } from "./graph.js";
+import { z } from "zod";
+
+// 定义严格的前端契约 Schema，防止幻觉导致 UI 崩溃
+const AgentChangeSchema = z.object({
+  type: z.string(),
+  target: z.string(),
+  summary: z.string(),
+  newText: z.string().optional(),
+  status: z.string().optional(),
+  imageCandidates: z.array(z.any()).optional(),
+  videoPlan: z.any().optional(),
+  editActions: z.array(z.any()).optional()
+}).passthrough();
+
+const ChangesArraySchema = z.array(AgentChangeSchema);
+
 
 /**
  * 原有的入口函数，现在代理给 LangGraph
@@ -52,10 +68,26 @@ export async function runAgentChat(payload) {
     
     // 提取结果并返回符合前端要求的数据格式
     const finalResponse = resultState.finalResponse;
+    const trace = resultState.trace || [];
+    
+    // 强制验证大模型生成的 changes 是否符合前端预期的 Schema
+    let validChanges = [];
+    if (finalResponse.changes && finalResponse.changes.length > 0) {
+      const validation = ChangesArraySchema.safeParse(finalResponse.changes);
+      if (validation.success) {
+        validChanges = validation.data;
+      } else {
+        console.error("[Schema Validation] 大模型输出的 changes 格式错误:", validation.error.message);
+        trace.push({ step: "schema_validation_failed", error: validation.error.message, rawData: finalResponse.changes });
+        validChanges = []; // 降级处理，避免前端崩溃
+      }
+    }
+
     return {
       reply: finalResponse.reply || "我无法提供有效的回答，请重试。",
       thinking: finalResponse.thinking || [],
-      changes: finalResponse.changes || [],
+      changes: validChanges,
+      trace: trace,
       provider: "langgraph",
       model: initialState.modelName
     };
@@ -65,6 +97,7 @@ export async function runAgentChat(payload) {
       reply: `抱歉，Agent 在处理您的请求时发生了错误：${error.message}`,
       thinking: ["执行出错，已进入降级处理"],
       changes: [],
+      trace: [{ step: "error", error: error.message }],
       provider: "error",
       model: initialState.modelName
     };

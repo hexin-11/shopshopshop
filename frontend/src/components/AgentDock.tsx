@@ -27,6 +27,7 @@ import {
   Wrench,
   X,
   Zap,
+  Bug,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { catalog, productScripts } from "../data/mockData";
@@ -1073,6 +1074,7 @@ export default function AgentDock({ children }: AgentDockProps) {
   );
   const [attachments, setAttachments] = useState<string[]>([]);
   const [agentLoading, setAgentLoading] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const [conversationMenuId, setConversationMenuId] = useState<number | string | null>(null);
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1661,10 +1663,19 @@ export default function AgentDock({ children }: AgentDockProps) {
           {/* Toggle button at top */}
           <div className="agent-sidebar-toggle-row">
             {!sidebarCollapsed && (
-              <div className="agent-history-top">
-                <button type="button" className="agent-new-chat" onClick={handleOpenVideoCreation}>
+              <div className="agent-history-top" style={{ display: "flex", gap: "8px" }}>
+                <button type="button" className="agent-new-chat" onClick={handleOpenVideoCreation} style={{ flex: 1 }}>
                   <Plus size={17} />
                   新会话
+                </button>
+                <button
+                  type="button"
+                  className={`agent-new-chat ${debugMode ? 'active' : ''}`}
+                  onClick={() => setDebugMode(!debugMode)}
+                  title="Toggle Debug Mode"
+                  style={{ width: "40px", padding: 0, justifyContent: "center", background: debugMode ? "rgba(220, 38, 38, 0.1)" : undefined, color: debugMode ? "#dc2626" : undefined }}
+                >
+                  <Bug size={17} />
                 </button>
               </div>
             )}
@@ -2067,12 +2078,22 @@ export default function AgentDock({ children }: AgentDockProps) {
                               )}
                             </article>
                           ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+                          </div>
+                        )}
+                        {debugMode && message.trace && message.trace.length > 0 && (
+                          <div className="agent-trace-list" style={{ marginTop: "12px", background: "rgba(0,0,0,0.03)", padding: "12px", borderRadius: "8px", fontSize: "12px", fontFamily: "monospace" }}>
+                            <div style={{ fontWeight: 600, color: "#dc2626", marginBottom: "8px" }}>🔧 Agent Trace Logs:</div>
+                            {message.trace.map((t, index) => (
+                              <pre key={`${message.id}-trace-${index}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                                {JSON.stringify(t, null, 2)}
+                              </pre>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
 
             <form
