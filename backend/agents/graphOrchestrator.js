@@ -81,7 +81,7 @@ function getLLM(streaming = false) {
       baseURL: config.textEndpoint.replace(/\/chat\/completions$/, ""),
     },
     temperature: 0.4,
-    streaming,
+    streaming: true,
     modelKwargs: {
       thinking: { type: "disabled" }
     }
@@ -155,7 +155,8 @@ async function createVideoTaskNode(state) {
   const timeline = buildTimeline(normalized, storyboard, videoPrompts);
   
   const firstPrompt = videoPrompts[0]?.prompt || normalized.productName;
-  const duration = Math.min(10, Math.max(3, Math.round(timeline.duration / Math.max(1, storyboard.length))));
+  // doubao-seedance-1-5-pro only accepts specific duration values (e.g. 5)
+  const duration = 5;
   
   // Submit asynchronous task
   const task = await createVideoTask({

@@ -48,7 +48,7 @@ function getLLM(streaming = false) {
     apiKey: config.textApiKey || config.apiKey,
     configuration: { baseURL: config.textEndpoint.replace(/\/chat\/completions$/, "") },
     temperature: 0.4,
-    streaming,
+    streaming: true,
     modelKwargs: { thinking: { type: "disabled" } }
   });
 }

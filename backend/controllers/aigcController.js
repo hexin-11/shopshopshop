@@ -107,7 +107,7 @@ export async function submitClipTaskController({ body }) {
       prompt: body.prompt,
       imageUrl: body.imageUrl,
       ratio: body.aspectRatio || "9:16",
-      duration: body.duration || 5,
+      duration: 5,
       generateAudio: false
     });
 

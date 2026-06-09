@@ -18,7 +18,7 @@ export async function loadEnvFile(rootDir) {
 
     const key = trimmed.slice(0, separator).trim();
     const value = trimmed.slice(separator + 1).trim().replace(/^["']|["']$/g, "");
-    if (key && process.env[key] === undefined) {
+    if (key) {
       process.env[key] = value;
     }
   }
