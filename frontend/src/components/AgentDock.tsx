@@ -1084,7 +1084,7 @@ export default function AgentDock({ children }: AgentDockProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // ── Video creation state ────────────────────────────────────────────────────
-  const [videoCreationMode, setVideoCreationMode] = useState(false);
+  const [videoCreationMode, setVideoCreationMode] = useState(() => window.location.hash === "#agent");
   const [vcStage, setVcStage] = useState<VideoCreationStage>("setup");
   const [vcProject, setVcProject] = useState<VideoProjectData | null>(null);
   const [vcLoading, setVcLoading] = useState(false);
@@ -1169,7 +1169,11 @@ export default function AgentDock({ children }: AgentDockProps) {
         window.location.href,
       );
     }
-    const onPopState = () => setOpen(window.location.hash === "#agent");
+    const onPopState = () => {
+      const isOpen = window.location.hash === "#agent";
+      setOpen(isOpen);
+      if (isOpen) setVideoCreationMode(true);
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -1427,107 +1431,147 @@ export default function AgentDock({ children }: AgentDockProps) {
     setVcLoading(true);
     setVcStage("outlining");
 
-    await new Promise((r) => setTimeout(r, 1800));
-
     const product = [...catalog].find((p) => p.id === vcForm.productId);
     const productName = product?.name ?? "商品";
     const videoTypeLabel = VIDEO_TYPES.find((t) => t.id === vcForm.videoType)?.label ?? vcForm.videoType;
     const styleLabel = vcForm.customStyle || (STYLE_PRESETS.find((s) => s.id === vcForm.style)?.label ?? vcForm.style);
 
-    const beats = getStoryBeats(vcForm.videoType);
-    const visualRefs: VisualRef[] = [];
-    if (product?.mainImage) {
-      visualRefs.push({ id: "r1", type: "brand", label: "商品主图", url: product.mainImage });
+    try {
+      const agentRes = await api.agentGenerate({
+        productName,
+        productDescription: (product as any)?.description || "",
+        sellingPoints: (product as any)?.sellingPoints || [],
+        tone: styleLabel,
+        platform: "抖音",
+        duration: parseInt(vcForm.duration) || 15,
+        videoType: vcForm.videoType,
+        userPrompt: vcForm.description
+      });
+
+      if (!agentRes.success || !agentRes.data) {
+        throw new Error(agentRes.message || "生成失败");
+      }
+
+      const generatedData = agentRes.data;
+      
+      const beats = generatedData.storyboard?.map((s: any, idx: number) => ({
+        id: s.shotId || `shot-${idx}`,
+        order: idx,
+        heading: s.shotId || `Shot ${idx + 1}`,
+        timestamp: `${idx * parseInt(vcForm.duration) / generatedData.storyboard.length}s`,
+        description: s.picture || s.subtitle,
+        duration: s.duration || 3,
+        status: "pending" as const
+      })) || getStoryBeats(vcForm.videoType); // Fallback to local if backend fails to return array
+
+      const visualRefs: VisualRef[] = [];
+      if (product?.mainImage) {
+        visualRefs.push({ id: "r1", type: "brand", label: "商品主图", url: product.mainImage });
+      }
+      if (vcForm.videoType === "influencer" || vcForm.videoType === "skit") {
+        visualRefs.push({ id: "r2", type: "character", label: "带货主播", url: "" });
+      } else if (vcForm.videoType === "product") {
+        visualRefs.push({ id: "r2", type: "scene", label: "使用场景", url: `https://picsum.photos/seed/${vcForm.productId}/300/300` });
+      }
+
+      const projectData: VideoProjectData = {
+        title: `${productName} · ${videoTypeLabel}`,
+        summary: generatedData.script?.overview || (summaryMap[vcForm.videoType] ?? summaryMap["product"]).replace("产品", productName),
+        fullPrompt: vcForm.description,
+        productName,
+        videoType: vcForm.videoType,
+        style: vcForm.style,
+        aspectRatio: vcForm.aspectRatio,
+        duration: vcForm.duration,
+        resolution: vcForm.resolution,
+        frameRate: vcForm.frameRate,
+        generationCount: vcForm.generationCount,
+        seed: vcForm.seed,
+        negativePrompt: vcForm.negativePrompt,
+        referenceWeight: vcForm.referenceWeight,
+        storyBeats: beats,
+        visualRefs,
+      };
+
+      setVcProject(projectData);
+      setVcLoading(false);
+      setVcStage("canvas");
+
+      // Register this as a session
+      const sessionId = `session-${Date.now()}`;
+      const newSession: VCSession = {
+        id: sessionId,
+        conversationId: activeConversationId,
+        title: projectData.title,
+        videoType: vcForm.videoType,
+        stage: "canvas",
+        thumbnail: product?.mainImage,
+        createdAt: "刚刚",
+        project: projectData,
+        form: { ...vcForm },
+      };
+      setVcSessions((prev) => [newSession, ...prev]);
+      setActiveVcSessionId(sessionId);
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeConversationId
+            ? {
+                ...c,
+                title: `${productName} ${videoTypeLabel}`,
+                updatedAt: "刚刚",
+                messages: [
+                  ...c.messages,
+                  {
+                    id: Date.now(),
+                    role: "agent" as const,
+                    text: `大纲已生成！根据你的描述，我设计了 ${beats.length} 个分镜节拍，风格：${styleLabel}，比例 ${vcForm.aspectRatio}，时长约 ${vcForm.duration}s。\n\n你可以直接在右侧点击任意分镜描述进行修改，或者在这里告诉我调整意见。确认后点击「开始生成」，我会逐个生成视频片段。`,
+                  },
+                ],
+              }
+            : c,
+        ),
+      );
+    } catch (e: any) {
+      console.error(e);
+      setVcLoading(false);
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeConversationId
+            ? {
+                ...c,
+                messages: [
+                  ...c.messages,
+                  {
+                    id: Date.now(),
+                    role: "agent" as const,
+                    text: `生成大纲失败：${e.message}。请稍后再试。`,
+                  },
+                ],
+              }
+            : c,
+        ),
+      );
     }
-    if (vcForm.videoType === "influencer" || vcForm.videoType === "skit") {
-      visualRefs.push({ id: "r2", type: "character", label: "带货主播", url: "" });
-    } else if (vcForm.videoType === "product") {
-      visualRefs.push({ id: "r2", type: "scene", label: "使用场景", url: `https://picsum.photos/seed/${vcForm.productId}/300/300` });
-    }
-
-    const projectData: VideoProjectData = {
-      title: `${productName} · ${videoTypeLabel}`,
-      summary: (summaryMap[vcForm.videoType] ?? summaryMap["product"]).replace("产品", productName),
-      fullPrompt: vcForm.description,
-      productName,
-      videoType: vcForm.videoType,
-      style: vcForm.style,
-      aspectRatio: vcForm.aspectRatio,
-      duration: vcForm.duration,
-      resolution: vcForm.resolution,
-      frameRate: vcForm.frameRate,
-      generationCount: vcForm.generationCount,
-      seed: vcForm.seed,
-      negativePrompt: vcForm.negativePrompt,
-      referenceWeight: vcForm.referenceWeight,
-      storyBeats: beats,
-      visualRefs,
-    };
-
-    setVcProject(projectData);
-    setVcLoading(false);
-    setVcStage("canvas");
-
-    // Register this as a session
-    const sessionId = `session-${Date.now()}`;
-    const newSession: VCSession = {
-      id: sessionId,
-      conversationId: activeConversationId,
-      title: projectData.title,
-      videoType: vcForm.videoType,
-      stage: "canvas",
-      thumbnail: product?.mainImage,
-      createdAt: "刚刚",
-      project: projectData,
-      form: { ...vcForm },
-    };
-    setVcSessions((prev) => [newSession, ...prev]);
-    setActiveVcSessionId(sessionId);
-
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeConversationId
-          ? {
-              ...c,
-              title: `${productName} ${videoTypeLabel}`,
-              updatedAt: "刚刚",
-              messages: [
-                ...c.messages,
-                {
-                  id: Date.now(),
-                  role: "agent" as const,
-                  text: `大纲已生成！根据你的描述，我设计了 ${beats.length} 个分镜节拍，风格：${styleLabel}，比例 ${vcForm.aspectRatio}，时长约 ${vcForm.duration}s。\n\n你可以直接在右侧点击任意分镜描述进行修改，或者在这里告诉我调整意见。确认后点击「开始生成」，我会逐个生成视频片段。`,
-                },
-              ],
-            }
-          : c,
-      ),
-    );
   };
 
   
   const generateClip = async (prompt, imageUrl, ratio, duration) => {
     try {
-      const createRes = await fetch('/api/generate-clip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, imageUrl, ratio, duration })
-      });
-      const createData = await createRes.json();
-      if (!createRes.ok || !createData.taskId) {
-        console.error("Generate failed:", createData);
+      const createRes = await api.agentGenerateClip({ prompt, imageUrl, ratio, duration });
+      if (!createRes.success || !createRes.taskId) {
+        console.error("Generate failed:", createRes);
         return null;
       }
       
-      const taskId = createData.taskId;
+      const taskId = createRes.taskId;
       while (true) {
         await new Promise(r => setTimeout(r, 5000));
-        const statusRes = await fetch(`/api/generate-clip/status?taskId=${taskId}`);
-        const statusData = await statusRes.json();
-        if (statusData.status === 'succeeded') {
-          return statusData.content.video_url;
-        } else if (statusData.status === 'failed') {
-          console.error("Task failed:", statusData);
+        const statusRes = await api.agentGenerateClipStatus(taskId);
+        if (statusRes.status === 'succeeded') {
+          return statusRes.content?.video_url || statusRes.content?.url;
+        } else if (statusRes.status === 'failed') {
+          console.error("Task failed:", statusRes);
           return null;
         }
       }
@@ -2000,155 +2044,6 @@ export default function AgentDock({ children }: AgentDockProps) {
           </section>
         )}
 
-        {/* ── NORMAL CHAT MODE ──────────────────────────────────────────────── */}
-        {!videoCreationMode && (
-          <section className={`agent-home ${isEmptyConversation ? "agent-home-empty" : ""}`}>
-            {isEmptyConversation && <h1>你好，想创作什么？</h1>}
-
-            <div className="agent-live-panel">
-              {activeConversation && (
-                <div className="agent-thread" aria-live="polite">
-                  {activeConversation.references.length > 0 && (
-                    <div className="agent-panel-note">
-                      当前参考：{activeConversation.references.join("、")}
-                    </div>
-                  )}
-                  {activeConversation.messages.map((message) => (
-                    <div key={message.id} className={`agent-message agent-message-${message.role}`}>
-                      <span>{message.role === "agent" ? "Agent" : "你"}</span>
-                      <p>{message.role === "agent" ? cleanAgentDisplayText(message.text) : message.text}</p>
-                      {message.thinking && message.thinking.length > 0 && (
-                        <div className="agent-thinking-list">
-                          {message.thinking.map((step, index) => (
-                            <small key={`${message.id}-thinking-${index}`}>{step}</small>
-                          ))}
-                        </div>
-                      )}
-                      {message.changes && message.changes.length > 0 && (
-                        <div className="agent-change-list">
-                          {message.changes.map((change, index) => (
-                            <article key={`${message.id}-${index}`} className="agent-change-card">
-                              <strong>{change.target}</strong>
-                              <small>{change.type}</small>
-                              <p>{change.summary}</p>
-                              {change.newText && <blockquote>{change.newText}</blockquote>}
-                              {change.imageCandidates && change.imageCandidates.length > 0 && (
-                                <div className="agent-image-grid">
-                                  {change.imageCandidates.map((candidate) => (
-                                    <div key={candidate.id} className="agent-image-option">
-                                      <img src={candidate.imageUrl} alt={candidate.title} />
-                                      <div>
-                                        <strong>{candidate.title}</strong>
-                                        <small>{candidate.style || "默认风格"}</small>
-                                      </div>
-                                      <p>{candidate.prompt}</p>
-                                      <div className="agent-card-actions">
-                                        <button type="button" onClick={() => selectImageCandidate(candidate)}>选这张</button>
-                                        <button type="button" onClick={() => requestVideoFromImage(candidate)}>图生视频</button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {change.videoPlan && (
-                                <div className="agent-video-plan">
-                                  <div>
-                                    <strong>{change.videoPlan.duration || 6}s</strong>
-                                    <span>{change.videoPlan.aspectRatio || "9:16"}</span>
-                                    <span>{change.videoPlan.motion || "平滑运镜"}</span>
-                                  </div>
-                                  {change.videoPlan.prompt && <p>{change.videoPlan.prompt}</p>}
-                                  {change.videoPlan.shots && (
-                                    <ol>
-                                      {change.videoPlan.shots.map((shot) => (
-                                        <li key={shot}>{shot}</li>
-                                      ))}
-                                    </ol>
-                                  )}
-                                </div>
-                              )}
-                              {change.editActions && change.editActions.length > 0 && (
-                                <div className="agent-edit-actions">
-                                  {change.editActions.map((item) => (
-                                    <span key={`${item.action}-${item.target}`}>
-                                      {item.action} · {item.target}：{item.value}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </article>
-                          ))}
-                          </div>
-                        )}
-                        {debugMode && message.trace && message.trace.length > 0 && (
-                          <div className="agent-trace-list" style={{ marginTop: "12px", background: "rgba(0,0,0,0.03)", padding: "12px", borderRadius: "8px", fontSize: "12px", fontFamily: "monospace" }}>
-                            <div style={{ fontWeight: 600, color: "#dc2626", marginBottom: "8px" }}>🔧 Agent Trace Logs:</div>
-                            {message.trace.map((t, index) => (
-                              <pre key={`${message.id}-trace-${index}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                                {JSON.stringify(t, null, 2)}
-                              </pre>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-            </div>
-
-            <form
-              className="agent-search-pill"
-              onSubmit={(e) => { e.preventDefault(); submitInput(); }}
-            >
-              
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitInput(); }
-                }}
-                placeholder="问问 TikFrame Agent"
-                rows={2}
-              />
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="agent-hidden-file"
-                onChange={(e) => handleFiles(e.currentTarget.files)}
-              />
-              <button type="button" className="agent-attach-button" aria-label="附加文件" onClick={() => fileInputRef.current?.click()}>
-                <Paperclip size={20} />
-              </button>
-              <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={() => setSkillMenuOpen((v) => !v)}>
-                <Wrench size={19} />
-                使用技能
-              </button>
-              <button type="submit" aria-label="发送给 Agent" className="agent-send-inline" disabled={agentLoading}>
-                <Send size={18} />
-              </button>
-              {skillMenuOpen && (
-                <div className="agent-skill-menu" onMouseDown={(e) => e.stopPropagation()}>
-                  {quickActions.map((action) => {
-                    const Icon = action.icon;
-                    return (
-                      <button key={action.label} type="button" onClick={() => runAction(action)}>
-                        <Icon size={17} />
-                        <span>{action.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </form>
-
-            {attachments.length > 0 && (
-              <div className="agent-status-strip">
-                <span>已附加：{attachments.join("、")}</span>
-              </div>
-            )}
-          </section>
-        )}
       </main>
     </div>
   );

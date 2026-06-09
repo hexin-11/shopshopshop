@@ -204,6 +204,7 @@ export const api = {
         script?: any;
         storyboard?: any[];
         videoPrompts?: any[];
+        timeline?: any;
         taskId?: string;
         taskStatus?: string;
         previewUrl?: string;
@@ -220,5 +221,27 @@ export const api = {
 
   async agentConversations() {
     return requestJson<{ items: unknown[]; store?: string }>("/api/agent/conversations");
+  },
+
+  async agentGenerateClip(payload: Record<string, unknown>) {
+    return requestJson<{
+      success: boolean;
+      taskId?: string;
+      message?: string;
+      code?: string;
+    }>("/api/generate-clip", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async agentGenerateClipStatus(taskId: string) {
+    return requestJson<{
+      success: boolean;
+      status?: string;
+      content?: any;
+      message?: string;
+      code?: string;
+    }>(`/api/generate-clip/status?taskId=${taskId}`);
   },
 };
