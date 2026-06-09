@@ -194,6 +194,29 @@ export const api = {
     });
   },
 
+  async agentGenerate(payload: Record<string, unknown>) {
+    return requestJson<{
+      success: boolean;
+      data: {
+        productAnalysis?: any;
+        analysis?: any;
+        script?: any;
+        storyboard?: any[];
+        videoPrompts?: any[];
+        taskId?: string;
+        taskStatus?: string;
+        previewUrl?: string;
+        mockVideoUrl?: string;
+        previewResult?: any;
+        trace?: any[];
+      };
+      message?: string;
+    }>("/api/agent/generate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   async agentConversations() {
     return requestJson<{ items: unknown[]; store?: string }>("/api/agent/conversations");
   },

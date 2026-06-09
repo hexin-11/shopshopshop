@@ -1,4 +1,4 @@
-import { ArrowUpRight, BarChart3, Clapperboard, Package, Zap } from "lucide-react";
+import { ArrowUpRight, BarChart3, Clapperboard, Loader2, Package, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { catalog, dashboardMetrics, platformPerformance, projects } from "../data/mockData";
 import { api } from "../lib/api";
@@ -16,6 +16,17 @@ export default function DashboardPage({
     featuredProjects: [...projects.slice(0, 3)] as any[],
     platformPerformance: [...platformPerformance] as any[],
   });
+  const [agentForm, setAgentForm] = useState({
+    productName: "保湿粉底液",
+    category: "美妆",
+    sellingPoints: "保湿、不卡粉、持妆8小时",
+    targetAudience: "20-30岁女性",
+    useScene: "通勤、约会、日常上妆",
+    tone: "自然生活化",
+  });
+  const [agentResult, setAgentResult] = useState<any>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState("");
 
   useEffect(() => {
     api.dashboard().then((next) =>
@@ -30,6 +41,44 @@ export default function DashboardPage({
 
   const openCreation = () => {
     window.dispatchEvent(new CustomEvent("tikframe:openVideoCreation", { detail: { productId: "" } }));
+  };
+
+  const updateAgentForm = (key: keyof typeof agentForm, value: string) => {
+    setAgentForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const runAgentGenerate = async () => {
+    setAgentLoading(true);
+    setAgentError("");
+    setAgentResult(null);
+    try {
+      const result = await api.agentGenerate({
+        productName: agentForm.productName,
+        category: agentForm.category,
+        sellingPoints: agentForm.sellingPoints
+          .split(/[、,，\n]/)
+          .map((item) => item.trim())
+          .filter(Boolean),
+        targetAudience: agentForm.targetAudience,
+        platform: "小红书",
+        duration: 30,
+        tone: agentForm.tone,
+        videoType: "口播带货",
+        style: agentForm.tone,
+        useScene: agentForm.useScene,
+        resolution: "1080x1920",
+      });
+      setAgentResult(result.data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      setAgentError(
+        message.includes("Failed to fetch") || message.includes("资源不存在") || message.includes("404")
+          ? "无法调用 /api/agent/generate，请确认后端已启动，并且是包含 Agent 接口的最新版本。"
+          : message || "无法连接后端，请确认后端已启动。",
+      );
+    } finally {
+      setAgentLoading(false);
+    }
   };
 
   return (
@@ -99,6 +148,110 @@ export default function DashboardPage({
             <p className="mt-2 text-sm font-semibold text-emerald-600">{metric.delta}</p>
           </button>
         ))}
+      </section>
+
+      <section className="rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-neutral-500">Agent 一键生成联调</p>
+            <h2 className="mt-1 text-xl font-extrabold text-neutral-950">电商带货视频生成</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+              输入商品信息后，调用后端 <span className="font-semibold text-neutral-700">/api/agent/generate</span>，返回商品分析、脚本、分镜、视频 Prompt 和 mock 任务结果。
+            </p>
+          </div>
+          <button onClick={runAgentGenerate} disabled={agentLoading || !agentForm.productName.trim()} className="btn-primary">
+            {agentLoading ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+            一键生成带货视频
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <label className="grid gap-2">
+            <span className="label">商品标题</span>
+            <input className="input" value={agentForm.productName} onChange={(e) => updateAgentForm("productName", e.target.value)} />
+          </label>
+          <label className="grid gap-2">
+            <span className="label">类目</span>
+            <input className="input" value={agentForm.category} onChange={(e) => updateAgentForm("category", e.target.value)} />
+          </label>
+          <label className="grid gap-2">
+            <span className="label">目标用户</span>
+            <input className="input" value={agentForm.targetAudience} onChange={(e) => updateAgentForm("targetAudience", e.target.value)} />
+          </label>
+          <label className="grid gap-2 lg:col-span-2">
+            <span className="label">卖点</span>
+            <input className="input" value={agentForm.sellingPoints} onChange={(e) => updateAgentForm("sellingPoints", e.target.value)} placeholder="用顿号或逗号分隔" />
+          </label>
+          <label className="grid gap-2">
+            <span className="label">风格语气</span>
+            <input className="input" value={agentForm.tone} onChange={(e) => updateAgentForm("tone", e.target.value)} />
+          </label>
+          <label className="grid gap-2 lg:col-span-3">
+            <span className="label">使用场景</span>
+            <textarea className="input min-h-[88px] resize-y" value={agentForm.useScene} onChange={(e) => updateAgentForm("useScene", e.target.value)} />
+          </label>
+        </div>
+
+        {agentError && (
+          <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {agentError.includes("Failed to fetch") ? "无法连接后端，请确认 backend 已启动并运行在 8787 端口。" : agentError}
+          </div>
+        )}
+
+        {agentResult && (
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <p className="text-sm font-black text-neutral-950">商品分析</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-600">{(agentResult.productAnalysis || agentResult.analysis)?.coreValue}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {((agentResult.productAnalysis || agentResult.analysis)?.mainSellingPoints || []).map((point: string) => (
+                  <span key={point} className="badge">{point}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <p className="text-sm font-black text-neutral-950">带货剧本</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-600">{agentResult.script?.fullVoiceover || agentResult.script?.hook}</p>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <p className="text-sm font-black text-neutral-950">分镜列表</p>
+              <div className="mt-3 space-y-3">
+                {(agentResult.storyboard || []).map((shot: any) => (
+                  <div key={shot.shotId} className="rounded-lg bg-white p-3 text-sm">
+                    <p className="font-bold text-neutral-900">#{shot.shotId} {shot.scene} · {shot.duration}s</p>
+                    <p className="mt-1 text-neutral-500">{shot.visual}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <p className="text-sm font-black text-neutral-950">视频 Prompt</p>
+              <div className="mt-3 space-y-3">
+                {(agentResult.videoPrompts || []).slice(0, 3).map((prompt: any) => (
+                  <div key={prompt.shotId} className="rounded-lg bg-white p-3 text-sm">
+                    <p className="font-bold text-neutral-900">镜头 {prompt.shotId} · {prompt.aspectRatio}</p>
+                    <p className="mt-1 line-clamp-3 text-neutral-500">{prompt.prompt}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-white p-4 lg:col-span-2">
+              <p className="text-sm font-black text-neutral-950">任务结果</p>
+              <div className="mt-3 grid gap-3 text-sm text-neutral-600 sm:grid-cols-3">
+                <div><span className="font-bold text-neutral-900">任务 ID：</span>{agentResult.taskId}</div>
+                <div><span className="font-bold text-neutral-900">任务状态：</span>{agentResult.taskStatus}</div>
+                <div>
+                  <span className="font-bold text-neutral-900">mock 预览：</span>
+                  {agentResult.previewUrl || agentResult.mockVideoUrl || agentResult.previewResult?.previewUrl}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">

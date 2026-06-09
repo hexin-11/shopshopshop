@@ -12,6 +12,8 @@ import { createJsonAppStore } from "./storage/jsonAppStore.js";
 import { createJsonAgentStore } from "./storage/jsonAgentStore.js";
 import { runAgentChat } from "./agent/chatAgent.js";
 import { loadEnvFile } from "./config/env.js";
+import { handleAigcRoutes } from "../routes/aigcRoutes.js";
+import { createVideoTask, getVideoTask, ArkClientError } from "../services/arkClient.js";
 
 const rootDir = fileURLToPath(new URL("..", import.meta.url));
 await loadEnvFile(rootDir);
@@ -354,6 +356,8 @@ async function handleApi(req, res) {
   const { pathname, searchParams } = parseQuery(req);
 
   if (req.method === "OPTIONS") return sendNoContent(res);
+  if (await handleAigcRoutes({ req, res, pathname, searchParams, readBody, sendJson })) return;
+
   if (pathname === "/api/health" && req.method === "GET") {
     return sendJson(res, 200, {
       status: "ok",
@@ -792,7 +796,7 @@ async function handleApi(req, res) {
   }
 
 
-  // --- Seedance API Integration ---
+  // --- Safe mock Seedance-compatible endpoints. Real Ark calls are added in a later stage. ---
   if (pathname === "/api/generate-clip" && req.method === "POST") {
     let payload;
     try {
@@ -800,9 +804,7 @@ async function handleApi(req, res) {
     } catch (error) {
       return badRequest(res, error.message);
     }
-    
-    const arkApiKey = process.env.ARK_API_KEY || "YOUR_ARK_API_KEY"; // Please set this in your environment
-    
+
     const content = [];
     if (payload.prompt) {
       content.push({ type: "text", text: payload.prompt });
@@ -816,54 +818,37 @@ async function handleApi(req, res) {
     }
 
     try {
-      const response = await fetch("https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${arkApiKey}`
-        },
-        body: JSON.stringify({
-          model: "doubao-seedance-1-5-pro-251215",
-          content,
-          generate_audio: payload.generateAudio ?? true,
-          ratio: payload.ratio || "16:9",
-          duration: payload.duration || 5,
-          watermark: false
-        })
+      const task = await createVideoTask({
+        prompt: payload.prompt,
+        imageUrl: payload.imageUrl,
+        duration: payload.duration,
+        ratio: payload.ratio,
+        generateAudio: payload.generateAudio,
       });
-      
-      const data = await response.json();
-      if (!response.ok) {
-        return sendJson(res, response.status, { error: data });
-      }
-      return sendJson(res, 201, { taskId: data.id });
+      return sendJson(res, 202, { success: true, ...task });
     } catch (error) {
-      return sendJson(res, 500, { error: error.message });
+      if (error instanceof ArkClientError) {
+        return sendJson(res, error.status || 500, { success: false, message: error.message, code: error.code });
+      }
+      return sendJson(res, 500, { success: false, message: "Ark video task creation failed" });
     }
   }
 
   if (pathname === "/api/generate-clip/status" && req.method === "GET") {
     const taskId = searchParams.get("taskId");
     if (!taskId) return badRequest(res, "taskId is required");
-    
-    const arkApiKey = process.env.ARK_API_KEY || "YOUR_ARK_API_KEY";
+
     try {
-      const response = await fetch(`https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/${taskId}`, {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${arkApiKey}`
-        }
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        return sendJson(res, response.status, { error: data });
-      }
-      return sendJson(res, 200, data);
+      const task = await getVideoTask(taskId);
+      return sendJson(res, 200, { success: true, ...task });
     } catch (error) {
-      return sendJson(res, 500, { error: error.message });
+      if (error instanceof ArkClientError) {
+        return sendJson(res, error.status || 500, { success: false, message: error.message, code: error.code });
+      }
+      return sendJson(res, 500, { success: false, message: "Ark video task query failed" });
     }
   }
-  // --- End Seedance API ---
+  // --- End safe mock Seedance-compatible endpoints ---
 
   if (pathname === "/api/assets/meta/filters" && req.method === "GET") {
     return sendJson(res, 200, buildFilters(await readAssets()));

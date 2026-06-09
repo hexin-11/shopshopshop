@@ -11,6 +11,23 @@ import { agentGraph } from "./graph.js";
 export async function runAgentChat(payload) {
   const message = String(payload?.message || "").trim();
   const attachments = Array.isArray(payload?.attachments) ? payload.attachments.map(String) : [];
+  const arkMock = String(process.env.ARK_MOCK ?? "true").toLowerCase() !== "false";
+
+  if (arkMock) {
+    return {
+      reply: message
+        ? `已收到你的需求：“${message}”。当前后端处于 ARK_MOCK=true，第 1 阶段只返回 mock 对话，真实模型调用已关闭。`
+        : "当前后端处于 ARK_MOCK=true，第 1 阶段只返回 mock 对话，真实模型调用已关闭。",
+      thinking: [
+        "识别用户输入",
+        "保持 mock 模式",
+        "等待后续阶段接入真实 Ark Client",
+      ],
+      changes: [],
+      provider: "mock",
+      model: process.env.ARK_TEXT_MODEL_NAME || "Doubao-Seed-2.0-lite",
+    };
+  }
   
   // 转换历史消息格式，确保它不包含空数据
   const historyMessages = Array.isArray(payload?.messages) ? payload.messages.map(m => ({
