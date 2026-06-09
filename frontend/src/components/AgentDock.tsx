@@ -114,6 +114,8 @@ interface StoryBeat {
   order: number;
   heading: string;
   description: string;
+  subtitle?: string;
+  voiceover?: string;
   duration: number;
   status: "pending" | "generating" | "done" | "failed";
   videoClipUrl?: string;
@@ -129,6 +131,7 @@ interface VisualRef {
 interface VideoProjectData {
   title: string;
   summary: string;
+  fullPrompt?: string;
   productName: string;
   videoType: string;
   style: string;
@@ -371,9 +374,33 @@ interface VCInputBoxProps {
 
 function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expanded, setExpanded, onSkillClick, skillMenuOpen, quickActions, runAction }: VCInputBoxProps) {
   const [showProductList, setShowProductList] = useState(false);
-  const selectedProduct = catalog.find((p) => p.id === form.productId);
+  const [productOptions, setProductOptions] = useState<any[]>([...catalog]);
+  const selectedProduct = productOptions.find((p) => p.id === form.productId);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const set = (key: keyof VCFormData, value: string) => onFormChange({ ...form, [key]: value });
+
+  useEffect(() => {
+    let mounted = true;
+    const refreshProducts = async () => {
+      try {
+        const products = await api.products();
+        if (mounted) setProductOptions(products);
+      } catch {
+        if (mounted) setProductOptions([...catalog]);
+      }
+    };
+    const handleProductCreated = () => {
+      refreshProducts();
+      setExpanded(true);
+      setShowProductList(true);
+    };
+    refreshProducts();
+    window.addEventListener("tikframe:productCreated", handleProductCreated);
+    return () => {
+      mounted = false;
+      window.removeEventListener("tikframe:productCreated", handleProductCreated);
+    };
+  }, [setExpanded]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -471,13 +498,13 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
                     <span style={{fontWeight: 500}}>{selectedProduct.name}</span>
                   </>
                 ) : (
-                  <span style={{ color: "rgba(23,23,25,0.4)" }}>无商品</span>
+                  <span style={{ color: "rgba(23,23,25,0.4)" }}>选择商品...</span>
                 )}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5, marginLeft: "auto" }}><path d="m6 9 6 6 6-6" /></svg>
               </button>
               {showProductList && (
                 <div className="vc-product-list vc-product-card-list vc-product-panel-list" style={{boxShadow: '0 8px 24px rgba(0,0,0,0.1)', border: '1px solid #eee'}}>
-                  {[...catalog].map((p) => {
+                  {productOptions.map((p) => {
                     const sellingPoint = productScripts[p.id]?.[0]?.content?.[1]?.body ?? `${p.category}商品，已整理可用于视频生成的商品素材。`;
                     return (
                       <div key={p.id} className={`vc-product-card-option ${form.productId === p.id ? "active" : ""}`}>
@@ -495,6 +522,7 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
                               window.history.pushState({}, "", `/products/${p.id}`);
                               window.dispatchEvent(new PopStateEvent("popstate"));
                               setShowProductList(false);
+                              window.dispatchEvent(new HashChangeEvent("hashchange"));
                             }}
                           >
                             编辑
@@ -515,7 +543,12 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
                     className="vc-product-add-entry"
                     onClick={() => {
                       setShowProductList(false);
-                      setShowAddProduct(true);
+                      window.sessionStorage.setItem("vibegen:add-product-return", window.location.pathname + window.location.search + window.location.hash);
+                      window.history.pushState({}, "", "/products");
+                      window.dispatchEvent(new PopStateEvent("popstate"));
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent("tikframe:openAddProduct"));
+                      }, 0);
                     }}
                   >
                     + 添加商品
@@ -817,12 +850,13 @@ interface ProjectCanvasViewProps {
   editingBeatId: string | null;
   onEditBeat: (id: string | null) => void;
   onUpdateBeat: (id: string, description: string) => void;
+  onUpdateBeatFields?: (id: string, data: Partial<StoryBeat>) => void;
   onRegenerateBeat: (id: string) => void;
   onAddRef: () => void;
   onUpdateProject?: (data: Partial<VideoProjectData>) => void;
 }
 
-function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdateBeat, onRegenerateBeat, onAddRef, onUpdateProject }: ProjectCanvasViewProps) {
+function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdateBeat, onUpdateBeatFields, onRegenerateBeat, onAddRef, onUpdateProject }: ProjectCanvasViewProps) {
   const completedCount = project.storyBeats.filter((b) => b.status === "done").length;
   const isCanvas = stage === "canvas";
   const isGenerating = stage === "generating";
@@ -833,7 +867,7 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
 
       {/* Summary */}
       <div className="vc-canvas-section">
-        <div className="vc-canvas-section-label">Summary</div>
+        <div className="vc-canvas-section-label">视频概要</div>
         <p className="vc-canvas-summary">{project.summary}</p>
       </div>
 
@@ -855,6 +889,30 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
       {onUpdateProject && isCanvas && (
         <div className="vc-canvas-edit-row">
           <label>
+            <span>视频比例</span>
+            <select value={project.aspectRatio} onChange={(e) => onUpdateProject({ aspectRatio: e.target.value })}>
+              {ASPECT_RATIOS.map((ratio) => (
+                <option key={ratio.id} value={ratio.id}>{ratio.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>时长</span>
+            <select value={project.duration} onChange={(e) => onUpdateProject({ duration: e.target.value })}>
+              {DURATIONS_MAP.map((duration) => (
+                <option key={duration.id} value={duration.id}>{duration.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>分辨率</span>
+            <select value={project.resolution} onChange={(e) => onUpdateProject({ resolution: e.target.value })}>
+              {RESOLUTIONS_MAP.map((resolution) => (
+                <option key={resolution.id} value={resolution.id}>{resolution.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
             <span>视频类型</span>
             <select value={project.videoType} onChange={(e) => onUpdateProject({ videoType: e.target.value })}>
               {VIDEO_TYPES.map((type) => (
@@ -863,19 +921,23 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
             </select>
           </label>
           <label>
-            <span>视频风格</span>
+            <span>风格</span>
             <select value={project.style} onChange={(e) => onUpdateProject({ style: e.target.value })}>
               {STYLE_PRESETS.map((style) => (
                 <option key={style.id} value={style.id}>{style.label}</option>
               ))}
             </select>
           </label>
+          <label className="vc-canvas-edit-wide">
+            <span>完整提示词</span>
+            <textarea value={project.fullPrompt || project.summary} onChange={(e) => onUpdateProject({ fullPrompt: e.target.value })} rows={3} />
+          </label>
         </div>
       )}
 
       {/* Visual References */}
       <div className="vc-canvas-section">
-        <div className="vc-canvas-section-label">Visual References</div>
+        <div className="vc-canvas-section-label">商品素材</div>
         <div className="vc-refs-grid">
           {project.visualRefs.map((ref) => (
             <div key={ref.id} className="vc-ref-card">
@@ -888,11 +950,11 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
               )}
               <span className="vc-ref-label">{ref.label}</span>
               <small className="vc-ref-type">
-                {ref.type === "brand" ? "Brand" : ref.type === "character" ? "Character" : ref.type === "scene" ? "Scene" : "Reference"}
+                {ref.type === "brand" ? "商品" : ref.type === "character" ? "人物" : ref.type === "scene" ? "场景" : "参考"}
               </small>
             </div>
           ))}
-          <button type="button" className="vc-ref-add" onClick={onAddRef} title="添加参考">
+          <button type="button" className="vc-ref-add" onClick={onAddRef} title="添加商品素材">
             <Plus size={20} />
           </button>
         </div>
@@ -901,7 +963,7 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
       {/* Story Beats */}
       <div className="vc-canvas-section">
         <div className="vc-canvas-section-label">
-          Story Beats
+          分镜
           {isGenerating && (
             <span className="vc-canvas-progress-label">
               {completedCount}/{project.storyBeats.length}
@@ -940,6 +1002,8 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
               {/* Description (editable in canvas mode) */}
               {isCanvas && (
                 <div className="vc-beat-description">
+                  <label className="vc-beat-edit-field">
+                    <span>分镜</span>
                   {editingBeatId === beat.id ? (
                     <textarea
                       autoFocus
@@ -958,6 +1022,23 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
                       {beat.description}
                     </p>
                   )}
+                  </label>
+                  <label className="vc-beat-edit-field">
+                    <span>字幕</span>
+                    <textarea
+                      value={beat.subtitle ?? beat.heading}
+                      onChange={(e) => onUpdateBeatFields?.(beat.id, { subtitle: e.target.value })}
+                      rows={2}
+                    />
+                  </label>
+                  <label className="vc-beat-edit-field">
+                    <span>口播</span>
+                    <textarea
+                      value={beat.voiceover ?? beat.description}
+                      onChange={(e) => onUpdateBeatFields?.(beat.id, { voiceover: e.target.value })}
+                      rows={2}
+                    />
+                  </label>
                 </div>
               )}
 
@@ -1365,6 +1446,7 @@ export default function AgentDock({ children }: AgentDockProps) {
     const projectData: VideoProjectData = {
       title: `${productName} · ${videoTypeLabel}`,
       summary: (summaryMap[vcForm.videoType] ?? summaryMap["product"]).replace("产品", productName),
+      fullPrompt: vcForm.description,
       productName,
       videoType: vcForm.videoType,
       style: vcForm.style,
@@ -1736,7 +1818,7 @@ export default function AgentDock({ children }: AgentDockProps) {
             <div className="agent-canvas-sessions-col">
               {/* Header with new session button */}
               <div className="agent-canvas-sessions-header">
-                <span className="agent-canvas-sessions-title">视频项目</span>
+                <span className="agent-canvas-sessions-title">视频项目列表</span>
                 <button type="button" className="agent-canvas-new-session-btn" onClick={handleOpenVideoCreation} title="新建创作">
                   <Plus size={15} />
                 </button>
@@ -1876,6 +1958,11 @@ export default function AgentDock({ children }: AgentDockProps) {
                   onUpdateBeat={(id, desc) =>
                     setVcProject((prev) =>
                       prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === id ? { ...b, description: desc } : b)) } : null,
+                    )
+                  }
+                  onUpdateBeatFields={(id, data) =>
+                    setVcProject((prev) =>
+                      prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === id ? { ...b, ...data } : b)) } : null,
                     )
                   }
                   onRegenerateBeat={handleRegenerateBeat}

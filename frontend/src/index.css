@@ -1678,8 +1678,10 @@ button, input, select, textarea { font: inherit; }
 .vc-product-panel-list {
   position: static;
   width: 100%;
-  max-height: 360px;
+  max-height: 420px;
   margin-top: 8px;
+  display: grid;
+  gap: 8px;
 }
 .vc-product-list button {
   display: flex;
@@ -1780,12 +1782,15 @@ button, input, select, textarea { font: inherit; }
 }
 
 .vc-product-list .vc-product-add-entry {
+  position: sticky;
+  bottom: 0;
   margin-top: 6px;
   border-top: 1px solid rgba(226, 232, 240, 0.78);
   border-radius: 10px;
   padding-top: 12px;
   color: #2563eb;
   font-weight: 900;
+  background: #fff;
 }
 
 .vc-ref-upload-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -2406,7 +2411,8 @@ button, input, select, textarea { font: inherit; }
   font-weight: 900;
 }
 
-.vc-canvas-edit-row select {
+.vc-canvas-edit-row select,
+.vc-canvas-edit-row textarea {
   height: 38px;
   border: 1px solid rgba(216, 226, 236, 0.9);
   border-radius: 10px;
@@ -2415,6 +2421,18 @@ button, input, select, textarea { font: inherit; }
   color: #171719;
   font-size: 13px;
   font-weight: 800;
+}
+
+.vc-canvas-edit-row textarea {
+  height: auto;
+  min-height: 84px;
+  padding: 10px 11px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.vc-canvas-edit-wide {
+  grid-column: 1 / -1;
 }
 
 .vc-canvas-chip {
@@ -2505,6 +2523,28 @@ button, input, select, textarea { font: inherit; }
 .vc-beat-action-btn:hover { border-color: rgba(70, 132, 238, 0.3); color: #4684EE; background: rgba(70, 132, 238, 0.06); }
 
 .vc-beat-description { margin-top: 10px; padding-left: 36px; }
+.vc-beat-edit-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.vc-beat-edit-field > span {
+  color: rgba(23, 23, 25, 0.46);
+  font-size: 12px;
+  font-weight: 900;
+}
+.vc-beat-edit-field textarea {
+  width: 100%;
+  border: 1px solid rgba(216, 226, 236, 0.9);
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: #171719;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  resize: vertical;
+}
 .vc-beat-desc-text {
   font-size: 13px; line-height: 1.65;
   color: rgba(23, 23, 25, 0.58);

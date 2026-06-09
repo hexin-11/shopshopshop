@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link2, Loader2, Plus, Upload, X, CheckCircle2, Image as ImageIcon, Video, Music, PlayCircle, AudioWaveform, ImagePlus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -45,6 +45,12 @@ export function AddProductDialog({ onCreated }: { onCreated?: (product: any) => 
 
   const filteredAssets = assets.filter(a => activeTab === "all" || a.type === activeTab);
 
+  useEffect(() => {
+    const openDialog = () => setOpen(true);
+    window.addEventListener("tikframe:openAddProduct", openDialog);
+    return () => window.removeEventListener("tikframe:openAddProduct", openDialog);
+  }, []);
+
   const handleSimulateFetch = () => {
     if (!url) return;
     setIsLoading(true);
@@ -86,14 +92,13 @@ export function AddProductDialog({ onCreated }: { onCreated?: (product: any) => 
   }
 
   const handleCreateProduct = async () => {
-    if (!formData.name || !formData.brand || !formData.category) return;
     setIsSaving(true);
     try {
       const mainAsset = assets.find((asset) => asset.id === mainImageId);
       const product = await api.createProduct({
-        name: formData.name,
-        brand: formData.brand,
-        category: formData.category,
+        name: formData.name.trim() || "新商品",
+        brand: formData.brand.trim() || "未填写品牌",
+        category: formData.category.trim() || "未分类",
         description: formData.details,
         mainImage: mainAsset?.url || "",
         assetCount: assets.length,
@@ -101,6 +106,16 @@ export function AddProductDialog({ onCreated }: { onCreated?: (product: any) => 
         projectCount: 0,
       });
       onCreated?.(product);
+      const createdProduct = product as { id?: string };
+      if (createdProduct.id) {
+        const returnTo = window.sessionStorage.getItem("vibegen:add-product-return");
+        if (returnTo) {
+          window.sessionStorage.removeItem("vibegen:add-product-return");
+          window.history.pushState({}, "", returnTo);
+          window.dispatchEvent(new PopStateEvent("popstate"));
+        }
+        window.dispatchEvent(new CustomEvent("tikframe:productCreated", { detail: { productId: createdProduct.id, returnTo } }));
+      }
       setOpen(false);
       setStep(1);
       setFormData({ name: "", brand: "", details: "", category: "" });
@@ -372,7 +387,7 @@ export function AddProductDialog({ onCreated }: { onCreated?: (product: any) => 
           ) : (
             <button
               onClick={handleCreateProduct}
-              disabled={isSaving || !formData.name || !formData.brand || !formData.category}
+              disabled={isSaving}
               className="btn-primary bg-emerald-600 hover:bg-emerald-700 border-emerald-600 whitespace-nowrap shrink-0"
             >
               {isSaving ? <Loader2 size={16} className="animate-spin" /> : null}

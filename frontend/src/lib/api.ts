@@ -14,6 +14,21 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
 
 type QueryValue = string | number | boolean | null | undefined;
 
+const LOCAL_PRODUCTS_KEY = "vibegen-local-products";
+
+function readLocalProducts() {
+  try {
+    return JSON.parse(window.localStorage.getItem(LOCAL_PRODUCTS_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalProduct(product: Record<string, unknown>) {
+  const products = readLocalProducts();
+  window.localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify([product, ...products]));
+}
+
 function buildPath(path: string, query?: Record<string, QueryValue>) {
   const url = new URL(path, API_BASE);
   Object.entries(query || {}).forEach(([key, value]) => {
@@ -68,18 +83,39 @@ export const api = {
 
   async products(query?: { keyword?: string; category?: string; sortBy?: string }) {
     const fallback = { items: [...fallbackProducts] as any[] };
-    return pageItems(await getWithFallback("/api/products", fallback, { ...query, pageSize: 100 }));
+    const remoteItems = pageItems(await getWithFallback("/api/products", fallback, { ...query, pageSize: 100 }));
+    const localItems = readLocalProducts();
+    return [...localItems, ...remoteItems.filter((item: any) => !localItems.some((local: any) => local.id === item.id))];
   },
 
   async product(id: string) {
-    return getWithFallback(`/api/products/${id}`, fallbackProducts.find((item) => item.id === id) || fallbackProducts[0]);
+    const localProduct = readLocalProducts().find((item: any) => item.id === id);
+    return localProduct || getWithFallback(`/api/products/${id}`, fallbackProducts.find((item) => item.id === id) || fallbackProducts[0]);
   },
 
   async createProduct(payload: Record<string, unknown>) {
-    return requestJson("/api/products", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    try {
+      return await requestJson("/api/products", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      const product = {
+        id: `prod-${Date.now()}`,
+        name: payload.name || "新商品",
+        brand: payload.brand || "",
+        category: payload.category || "未分类",
+        description: payload.description || "",
+        mainImage: payload.mainImage || "",
+        assetCount: payload.assetCount || 0,
+        scriptCount: payload.scriptCount || 0,
+        projectCount: payload.projectCount || 0,
+        status: "制作中",
+        updatedAt: "刚刚",
+      };
+      saveLocalProduct(product);
+      return product;
+    }
   },
 
   async productAssets(productId: string) {

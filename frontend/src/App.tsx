@@ -41,10 +41,21 @@ export default function App() {
     };
     window.addEventListener("tikframe:openProjectWorkspace", onOpenWorkspace);
 
+    const onProductCreated = (e: any) => {
+      const productId = e.detail?.productId;
+      if (!productId) return;
+      setSelectedProductId(productId);
+      if (e.detail?.returnTo) {
+        setRoute(routeFromLocation());
+      }
+    };
+    window.addEventListener("tikframe:productCreated", onProductCreated);
+
     return () => {
       window.removeEventListener("popstate", onPopState);
       window.removeEventListener("tikframe:openProjects", onOpenProjects as EventListener);
       window.removeEventListener("tikframe:openProjectWorkspace", onOpenWorkspace);
+      window.removeEventListener("tikframe:productCreated", onProductCreated);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
