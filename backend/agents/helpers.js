@@ -34,3 +34,13 @@ export function compactTrace(step, llmResult) {
     generatedAt: new Date().toISOString(),
   };
 }
+
+export function parseLLMJson(text) {
+  try {
+    let cleanText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    return JSON.parse(cleanText);
+  } catch (e) {
+    console.error("JSON Parse Error:", text);
+    throw new Error("Failed to parse LLM response as JSON");
+  }
+}

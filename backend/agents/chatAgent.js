@@ -14,13 +14,22 @@ class MockChatModel extends ChatOpenAI {
     return this;
   }
   async invoke(messages, options) {
+    // If the last message is a ToolMessage, it means the tool was already executed.
+    // We must return a plain text response to stop the agent loop.
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage._getType() === "tool") {
+      return new AIMessage({
+        content: "我已成功执行修改，请查看右侧画布的变化！"
+      });
+    }
+
     const text = "这是一个模拟的聊天回复，我已经为你准备好了分镜修改！";
     return new AIMessage({ 
       content: text,
       tool_calls: [
         {
           name: "edit_storyboard",
-          args: { sceneIndex: 0, newDescription: "【Agent 修改】" },
+          args: { instruction: "修改分镜", currentStoryboard: "[]" },
           id: "call_mock123"
         }
       ]
@@ -36,7 +45,7 @@ function getLLM(streaming = false) {
   
   return new ChatOpenAI({
     modelName: config.textModel,
-    apiKey: config.apiKey,
+    apiKey: config.textApiKey || config.apiKey,
     configuration: { baseURL: config.textEndpoint.replace(/\/chat\/completions$/, "") },
     temperature: 0.4,
     streaming,

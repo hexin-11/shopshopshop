@@ -1585,10 +1585,13 @@ export default function AgentDock({ children }: AgentDockProps) {
       while (true) {
         await new Promise(r => setTimeout(r, 5000));
         const statusRes = await api.agentGenerateClipStatus(taskId);
-        if (statusRes.status === 'succeeded') {
-          return statusRes.content?.video_url || statusRes.content?.url;
-        } else if (statusRes.status === 'failed') {
-          console.error("Task failed:", statusRes);
+        const taskStatus = statusRes.data;
+        if (!taskStatus) continue;
+        
+        if (taskStatus.status === 'completed') {
+          return taskStatus.result?.clipUrl || taskStatus.result?.video_url;
+        } else if (taskStatus.status === 'failed') {
+          console.error("Task failed:", taskStatus);
           return null;
         }
       }
@@ -1696,10 +1699,9 @@ export default function AgentDock({ children }: AgentDockProps) {
     try {
       const messages = activeConversation?.messages.map(m => ({ role: m.role, content: m.text })) || [];
       messages.push({ role: "user", content: text });
-      
       const result = await api.agentChat({
         message: text,
-        messages: messages,
+        messages: messages.slice(-10),
         conversationId: activeConversationId,
         context: vcProject,
       });

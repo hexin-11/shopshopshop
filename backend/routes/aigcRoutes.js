@@ -104,8 +104,7 @@ export async function handleAigcRoutes({ req, res, pathname, searchParams, readB
       sendJson(res, 400, { success: false, message: body.__invalidJson });
       return true;
     }
-    await chatAgentController({ body, req, res });
-    return true;
+    return execute(chatAgentController, { body, req, res });
   }
 
   return false;

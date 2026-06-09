@@ -265,43 +265,76 @@ export const api = {
       body: JSON.stringify(payload),
     });
   
+    const contentType = response.headers.get("Content-Type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      if (data.reply) {
+        onProgress(data.reply, null, null);
+      }
+      if (data.changes && data.changes.length > 0) {
+        for (const change of data.changes) {
+          onProgress("", null, change);
+        }
+      }
+      return;
+    }
+
     if (!response.body) throw new Error("No response body");
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
   
+    const processChunk = (chunk: string) => {
+      if (!chunk.trim()) return;
+      
+      // Fallback for raw JSON if server misbehaved on content-type
+      if (chunk.trim().startsWith("{")) {
+        try {
+          const data = JSON.parse(chunk);
+          if (data.reply) onProgress(data.reply, null, null);
+          if (data.changes) {
+            for (const change of data.changes) onProgress("", null, change);
+          }
+          return;
+        } catch(e) {}
+      }
+
+      const typeMatch = chunk.match(/event:\s*(.*?)(?:\r?\n|$)/);
+      const dataMatch = chunk.match(/data:\s*(.*)(?:\r?\n|$)/);
+      if (typeMatch && dataMatch) {
+        const type = typeMatch[1].trim();
+        try {
+          const data = JSON.parse(dataMatch[1].trim());
+          if (type === "message") {
+            onProgress(data.text, null, null);
+          } else if (type === "tool_call") {
+            onProgress("", data.call, null);
+          } else if (type === "tool_result") {
+            onProgress("", null, data);
+          } else if (type === "error") {
+            throw new Error(data.message);
+          }
+        } catch(e) {
+          console.error("Parse error:", e, dataMatch[1]);
+        }
+      }
+    };
+
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        if (buffer.trim()) processChunk(buffer);
+        break;
+      }
   
       buffer += decoder.decode(value, { stream: true });
       const chunks = buffer.split(/\r?\n\r?\n/);
       buffer = chunks.pop() || "";
       
       for (const chunk of chunks) {
-        if (!chunk.trim()) continue;
-        const typeMatch = chunk.match(/event:\s*(.*?)(?:\r?\n|$)/);
-        const dataMatch = chunk.match(/data:\s*(.*)(?:\r?\n|$)/);
-        if (typeMatch && dataMatch) {
-          const type = typeMatch[1].trim();
-          try {
-            const data = JSON.parse(dataMatch[1].trim());
-            if (type === "message") {
-              onProgress(data.text, null, null);
-            } else if (type === "tool_call") {
-              onProgress("", data.call, null);
-            } else if (type === "tool_result") {
-              onProgress("", null, data);
-            } else if (type === "error") {
-              throw new Error(data.message);
-            }
-          } catch(e) {
-            console.error("Parse error:", e, dataMatch[1]);
-          }
-        }
+        processChunk(chunk);
       }
     }
-    return { success: true };
   },
 
   async agentConversations() {

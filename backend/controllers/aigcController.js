@@ -10,6 +10,7 @@ import {
 } from "../services/mockWorkflowService.js";
 import { fail, ok, normalizeProductInput } from "../utils/aigcResponse.js";
 import { createTask, updateTask, getTask as getTaskFromQueue } from "../utils/taskQueue.js";
+import { isArkMockEnabled } from "../services/arkClient.js";
 
 export async function uploadMaterialController({ body }) {
   return { status: 201, body: ok(uploadMaterial(body)) };
@@ -98,26 +99,34 @@ export async function submitGenerationTaskController({ body }) {
   return { status: 202, body: ok({ taskId }) };
 }
 
-export async function submitClipTaskController({ body }) {
-  // Simulate clip generation
-  const taskId = createTask("generate-clip", body);
+import { createVideoTask, getVideoTask } from "../services/arkClient.js";
 
-  (async () => {
-    updateTask(taskId, { status: "processing", progress: 10, message: "正在准备生成切片..." });
-    await new Promise(r => setTimeout(r, 1000));
-    updateTask(taskId, { status: "processing", progress: 50, message: "模型渲染中..." });
-    await new Promise(r => setTimeout(r, 2000));
-    updateTask(taskId, { 
-      status: "completed", 
-      progress: 100, 
-      message: "切片生成完毕", 
+export async function submitClipTaskController({ body }) {
+  try {
+    const arkTask = await createVideoTask({
+      prompt: body.prompt,
+      imageUrl: body.imageUrl,
+      ratio: body.aspectRatio || "9:16",
+      duration: body.duration || 5,
+      generateAudio: false
+    });
+
+    const localTaskId = createTask("generate-clip", { ...body, arkTaskId: arkTask.taskId });
+    
+    updateTask(localTaskId, { 
+      status: arkTask.status === "succeeded" ? "completed" : "processing", 
+      progress: arkTask.progress || 0, 
+      message: "视频生成任务已提交到云端", 
       result: {
-        clipUrl: "https://vjs.zencdn.net/v/oceans.mp4"
+        clipUrl: arkTask.previewUrl || arkTask.exportUrl || null
       }
     });
-  })();
 
-  return { status: 202, body: ok({ taskId }) };
+    return { status: 202, body: ok({ taskId: localTaskId }) };
+  } catch (error) {
+    console.error("Clip Task Error:", error);
+    return { status: 500, body: fail(error.message) };
+  }
 }
 
 export async function taskStatusController({ searchParams }) {
@@ -127,7 +136,28 @@ export async function taskStatusController({ searchParams }) {
   const task = getTaskFromQueue(taskId);
   if (!task) return { status: 404, body: fail("任务不存在") };
 
-  return { status: 200, body: ok(task) };
+  if (task.type === "generate-clip" && task.data?.arkTaskId && task.status !== "completed" && task.status !== "failed") {
+    try {
+      const arkStatus = await getVideoTask(task.data.arkTaskId);
+      
+      let newStatus = task.status;
+      if (arkStatus.status === "succeeded") newStatus = "completed";
+      else if (arkStatus.status === "failed") newStatus = "failed";
+
+      updateTask(taskId, {
+        status: newStatus,
+        progress: arkStatus.progress || task.progress,
+        message: newStatus === "completed" ? "切片生成完毕" : "模型渲染中...",
+        result: {
+          clipUrl: arkStatus.previewUrl || arkStatus.exportUrl || task.result?.clipUrl || null
+        }
+      });
+    } catch (e) {
+      console.error("Failed to sync Ark video status:", e);
+    }
+  }
+
+  return { status: 200, body: ok(getTaskFromQueue(taskId)) };
 }
 
 export async function chatAgentController({ body, req, res }) {
@@ -151,20 +181,28 @@ export async function chatAgentController({ body, req, res }) {
       const lastMsg = result.messages[result.messages.length - 1];
       reply = lastMsg.content || "任务已完成。";
 
-      // Look for tool calls in the last AI message
-      const lastAiMsg = result.messages.slice().reverse().find(m => m._getType() === "ai");
-      if (lastAiMsg && lastAiMsg.tool_calls && lastAiMsg.tool_calls.length > 0) {
-        for (const tc of lastAiMsg.tool_calls) {
+      // Look for tool calls in any AI message in the turn
+      const aiMsgWithTools = result.messages.slice().reverse().find(m => m._getType() === "ai" && m.tool_calls && m.tool_calls.length > 0);
+      if (aiMsgWithTools) {
+        for (const tc of aiMsgWithTools.tool_calls) {
           if (tc.name === "edit_storyboard") {
             try {
               let beatsStr;
-              // If it's the mock response, we can just grab the mocked scene changes.
-              // We'll parse the context's storyBeats, apply a mock change, and stringify it back.
-              const beats = context?.storyBeats || [];
-              if (beats.length > 0) {
-                beats[0].description = "【Agent 修改】" + beats[0].description;
+              
+              // Find the corresponding ToolMessage
+              const toolMsg = result.messages.find(m => m._getType() === "tool" && m.tool_call_id === tc.id);
+              
+              if (!isArkMockEnabled() && toolMsg) {
+                // Use the real output from the tool
+                beatsStr = toolMsg.content;
+              } else {
+                // Fallback to mock
+                const beats = context?.storyBeats || [];
+                if (beats.length > 0) {
+                  beats[0].visual = "【Agent 修改】" + beats[0].visual;
+                }
+                beatsStr = JSON.stringify(beats);
               }
-              beatsStr = JSON.stringify(beats);
               
               changes.push({
                 type: "edit_storyboard",
