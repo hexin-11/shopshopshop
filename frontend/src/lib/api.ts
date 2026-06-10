@@ -209,6 +209,9 @@ export const api = {
     const contentType = response.headers.get("Content-Type") || "";
     if (contentType.includes("application/json")) {
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Agent 对话失败");
+      }
       if (data.reply) {
         onProgress(data.reply, null, null);
       }

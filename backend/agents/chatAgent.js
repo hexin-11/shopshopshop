@@ -53,9 +53,14 @@ function getLLM(streaming = false) {
   return new ChatOpenAI({
     modelName: config.textModel,
     apiKey: config.textApiKey || config.apiKey,
-    configuration: { baseURL: config.textEndpoint.replace(/\/chat\/completions$/, "") },
+    configuration: { 
+      baseURL: config.textEndpoint.replace(/\/chat\/completions$/, ""),
+      defaultHeaders: {
+        "X-DashScope-OssResourceResolve": "enable"
+      }
+    },
     temperature: 0.4,
-    streaming: true,
+    streaming: false,
     modelKwargs: { thinking: { type: "disabled" } }
   });
 }
@@ -63,26 +68,48 @@ function getLLM(streaming = false) {
 const editStoryboardTool = tool(
   async ({ instruction, currentStoryboard }) => {
     console.log("[editStoryboardTool] invoked with instruction:", instruction);
-    const llm = getLLM(false);
     
     if (isArkMockEnabled()) {
-       try {
-           const parsed = JSON.parse(currentStoryboard);
-           if (parsed.length > 0) {
-               parsed[0].visual = "已应用修改：" + instruction;
-           }
-           return JSON.stringify(parsed);
-       } catch (e) {
-           return currentStoryboard;
-       }
+      try {
+        const parsed = JSON.parse(currentStoryboard);
+        if (parsed.length > 0) {
+          parsed[0].visual = "已应用修改：" + instruction;
+        }
+        return JSON.stringify(parsed);
+      } catch (e) {
+        return currentStoryboard;
+      }
     }
-    
-    const res = await llm.invoke(`请根据以下要求修改分镜JSON数组并原样返回修改后的JSON数组，不要输出markdown格式，只输出合法JSON：
-要求: ${instruction}
-当前分镜: ${currentStoryboard}`);
-    
-    let text = res.content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    return text;
+
+    const config = getArkConfig();
+    const response = await fetch(config.textEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${config.textApiKey || config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.textModel,
+        messages: [
+          {
+            role: "user",
+            content: `请根据以下要求修改分镜JSON数组并原样返回修改后的JSON数组，不要输出markdown格式，只输出合法JSON：\n要求: ${instruction}\n当前分镜: ${currentStoryboard}`
+          }
+        ],
+        temperature: 0.4,
+        max_tokens: 2000,
+      }),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      console.error("Failed to call Ark API:", responseText);
+      return currentStoryboard;
+    }
+
+    const data = JSON.parse(responseText);
+    const text = (data.choices?.[0]?.message?.content || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    return text || currentStoryboard;
   },
   {
     name: "edit_storyboard",

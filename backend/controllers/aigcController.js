@@ -81,7 +81,12 @@ export async function submitGenerationTaskController({ body }) {
           case "generateScript": progressMsg = "成功撰写短视频带货脚本"; progress = 50; break;
           case "generateStoryboard": progressMsg = "已将脚本拆解为具体的视频分镜"; progress = 70; break;
           case "generateVideoPrompt": progressMsg = "完成各分镜的视觉生成提示词构建"; progress = 90; break;
-          case "submitVideoTask": progressMsg = "视频合成任务已成功下发到云端"; progress = 100; break;
+          case "submitVideoTask":
+            progressMsg = nodeState.videoTaskError
+              ? "脚本和分镜已完成，视频任务暂未提交成功"
+              : "视频合成任务已成功下发到云端";
+            progress = 100;
+            break;
         }
 
         if (progressMsg) {
@@ -217,17 +222,64 @@ export async function chatAgentController({ body, req, res }) {
 
     return {
       status: 200,
-      body: JSON.stringify({
+      body: {
         reply: reply,
         thinking: ["分析你的需求", "调用相应工具", "生成最终结果"],
         changes: changes
-      })
+      }
     };
   } catch (err) {
     console.error("ChatAgent Error:", err);
     return {
       status: 500,
-      body: JSON.stringify({ error: err.message })
+      body: fail(err.message)
     };
+  }
+}
+
+export async function agentGenerateController({ body }) {
+  const input = normalizeProductInput(body);
+  if (!input.productName) {
+    return { status: 400, body: fail("productName 必填") };
+  }
+
+  try {
+    let productAnalysis, script, storyboard;
+    
+    try {
+      productAnalysis = body.analysis || await ProductAnalysisAgent.run(input);
+    } catch (e) {
+      console.error("ProductAnalysisAgent error:", e);
+      productAnalysis = { error: e.message };
+    }
+
+    try {
+      script = body.script || await ScriptAgent.run({ input, analysis: productAnalysis });
+    } catch (e) {
+      console.error("ScriptAgent error:", e);
+      script = { error: e.message };
+    }
+
+    try {
+      storyboard = body.storyboard || await StoryboardAgent.run({ input, analysis: productAnalysis, script });
+    } catch (e) {
+      console.error("StoryboardAgent error:", e);
+      storyboard = [{ error: e.message }];
+    }
+
+    return {
+      status: 200,
+      body: {
+        success: true,
+        data: {
+          productAnalysis,
+          script,
+          storyboard: Array.isArray(storyboard) ? storyboard : [storyboard],
+          trace: ["Agent pipeline completed"]
+        }
+      }
+    };
+  } catch (error) {
+    return { status: 500, body: fail(error.message) };
   }
 }

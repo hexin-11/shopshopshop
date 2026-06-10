@@ -9,6 +9,7 @@ import {
   submitGenerationTaskController,
   submitClipTaskController,
   taskStatusController,
+  agentGenerateController,
 } from "../controllers/aigcController.js";
 
 async function parseBody(req, readBody) {
@@ -104,9 +105,16 @@ export async function handleAigcRoutes({ req, res, pathname, searchParams, readB
       sendJson(res, 400, { success: false, message: body.__invalidJson });
       return true;
     }
-    // chatAgentController owns its own SSE response — bypass execute()
-    await chatAgentController({ body, req, res });
-    return true;
+    return execute(chatAgentController, { body, req, res });
+  }
+
+  if (pathname === "/api/agent/generate" && req.method === "POST") {
+    const body = await parseBody(req, readBody);
+    if (body.__invalidJson) {
+      sendJson(res, 400, { success: false, message: body.__invalidJson });
+      return true;
+    }
+    return execute(agentGenerateController, { body });
   }
 
   return false;

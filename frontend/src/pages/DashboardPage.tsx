@@ -18,13 +18,14 @@ export default function DashboardPage({
   });
 
   useEffect(() => {
-    api.dashboard().then((next) => {
-      if (next.data) {
+    api.dashboard().then((next: any) => {
+      const data = next?.data || next;
+      if (data) {
         setDashboard((prev) => ({
-          metrics: [...(next.data.metrics || prev.metrics)],
-          recentProducts: [...(next.data.recentProducts || prev.recentProducts)].slice(0, 4),
+          metrics: [...(data.metrics || prev.metrics)],
+          recentProducts: [...(data.recentProducts || prev.recentProducts)].slice(0, 4),
           featuredProjects: [...projects.slice(0, 3)],
-          platformPerformance: [...(next.data.platformPerformance || prev.platformPerformance)],
+          platformPerformance: [...(data.platformPerformance || prev.platformPerformance)],
         }));
       }
     });

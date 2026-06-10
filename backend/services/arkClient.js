@@ -58,6 +58,10 @@ export function isArkMockEnabled(env = process.env) {
   return getArkConfig(env).mock;
 }
 
+function uniqueValues(values) {
+  return values.filter(Boolean).filter((value, index, array) => array.indexOf(value) === index);
+}
+
 export async function generateText(options, env = process.env) {
   const config = getArkConfig(env);
 
@@ -75,37 +79,47 @@ export async function generateText(options, env = process.env) {
 
   requireConfig(config, ["textApiKey", "textEndpoint", "textModel"]);
 
-  const response = await fetch(config.textEndpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.textApiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.textModel,
-      messages: options.messages,
-      temperature: options.temperature ?? 0.4,
-      max_tokens: options.maxTokens,
-    }),
+  const requestBody = JSON.stringify({
+    model: config.textModel,
+    messages: options.messages,
+    temperature: options.temperature ?? 0.4,
+    max_tokens: options.maxTokens,
   });
+  const keyCandidates = uniqueValues([config.textApiKey, config.apiKey, config.videoApiKey]);
+  let lastError = null;
 
-  const responseText = await response.text();
-  if (!response.ok) {
-    throw new ArkClientError(safeErrorMessage("Ark text generation", response.status, responseText), {
-      status: response.status,
-      code: "ARK_TEXT_REQUEST_FAILED",
+  for (const apiKey of keyCandidates) {
+    const response = await fetch(config.textEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: requestBody,
     });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      lastError = new ArkClientError(safeErrorMessage("Ark text generation", response.status, responseText), {
+        status: response.status,
+        code: "ARK_TEXT_REQUEST_FAILED",
+      });
+      if (response.status === 401 && keyCandidates.length > 1) continue;
+      throw lastError;
+    }
+
+    const raw = JSON.parse(responseText);
+    return {
+      id: raw.id,
+      provider: "ark",
+      model: config.textModel,
+      mock: false,
+      content: raw.choices?.[0]?.message?.content || "",
+      raw,
+    };
   }
 
-  const raw = JSON.parse(responseText);
-  return {
-    id: raw.id,
-    provider: "ark",
-    model: config.textModel,
-    mock: false,
-    content: raw.choices?.[0]?.message?.content || "",
-    raw,
-  };
+  throw lastError || new ArkClientError("Ark text generation failed", { code: "ARK_TEXT_REQUEST_FAILED" });
 }
 
 // Async generator – streams raw token strings from Ark (SSE)

@@ -32,7 +32,7 @@ export default function TopNav({ current, navigate, onLogout }: TopNavProps) {
   }, []);
 
   useEffect(() => {
-    api.currentUser().then((nextUser) => {
+    api.currentUser().then((nextUser: any) => {
       if (nextUser) setUser(nextUser);
     });
   }, []);

@@ -118,7 +118,7 @@ interface StoryBeat {
   subtitle?: string;
   voiceover?: string;
   duration: number;
-  status: "pending" | "generating" | "done" | "generated" | "mock_ready" | "failed" | "prompt_ready";
+  status: "pending" | "generating" | "generated" | "failed" | "prompt_ready";
   videoClipUrl?: string;   // 只有真实 http/https 视频才存这里
   errorMessage?: string;   // failed 时的错误原因
 }
@@ -275,6 +275,57 @@ function isPlayableVideoUrl(url?: string): boolean {
   return typeof url === 'string' && /^https?:\/\//.test(url);
 }
 
+function parseDurationSeconds(value: unknown, fallback = 5): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const match = value.match(/\d+/);
+    if (match) return Number(match[0]);
+  }
+  return fallback;
+}
+
+function normalizeStoryBeatFromAgent(raw: any, index: number): StoryBeat {
+  const heading =
+    raw.heading ||
+    raw.scene ||
+    raw.title ||
+    raw["场景"] ||
+    raw["画面"] ||
+    raw["景别"] ||
+    raw["镜号"] ||
+    `分镜 ${index + 1}`;
+  const description =
+    raw.description ||
+    raw.visual ||
+    raw.prompt ||
+    raw["画面内容"] ||
+    raw["画面描述"] ||
+    raw["内容"] ||
+    "";
+
+  return {
+    id: String(raw.id || raw.shotId || raw["分镜编号"] || raw["镜号"] || `shot-${index + 1}`),
+    order: index,
+    heading: String(heading),
+    description: String(description),
+    subtitle: raw.subtitle || raw["字幕"] || "",
+    voiceover: raw.voiceover || raw["台词"] || raw["旁白"] || "",
+    duration: parseDurationSeconds(raw.duration || raw["时长"], 5),
+    status: "pending",
+  };
+}
+
+function displayBeatHeading(heading: string, index: number): string {
+  const labels: Record<string, string> = {
+    hook: "开场钩子",
+    product_reveal: "产品亮相",
+    key_selling_point: "核心卖点",
+    usage_scene: "使用场景",
+    result_cta: "转化引导",
+  };
+  return labels[heading] || heading || `分镜 ${index + 1}`;
+}
+
 const createConversation = (): Conversation => {
   const id = Date.now();
   return { id, title: "新会话", updatedAt: "刚刚", references: [], messages: [] };
@@ -419,7 +470,7 @@ function VCInputBox({ form, onFormChange, onSubmit, loading, fileInputRef, expan
         <button type="button" className="agent-skill-button" aria-label="使用技能" onClick={onSkillClick}>
           <Wrench size={19} />使用技能
         </button>
-        <button type="button" className="agent-send-inline" disabled={loading || !form.description.trim()} onClick={(e) => { e.stopPropagation(); onSubmit(); }}>
+        <button type="submit" className="agent-send-inline" aria-label="生成视频方案" title="生成视频方案" disabled={loading || !form.description.trim()}>
           {loading ? <Loader2 size={16} className="vc-spin" /> : <Send size={18} />}
         </button>
         
@@ -734,11 +785,6 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
                   <FileText size={20} style={{ color: "#94a3b8" }} />
                   <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textAlign: 'center' }}>Prompt 已生成，等待生成视频</span>
                 </div>
-              ) : beat.status === "mock_ready" || beat.status === "done" ? (
-                <div className="vc-shot-placeholder" style={{ flexDirection: 'column', gap: 6 }}>
-                  <Film size={20} style={{ color: "#94a3b8" }} />
-                  <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>模拟素材</span>
-                </div>
               ) : beat.status === "failed" ? (
                 <div className="vc-shot-placeholder" style={{ flexDirection: 'column', gap: 6 }}>
                   <span style={{ fontSize: 11, color: "#ef4444", fontWeight: 600 }}>生成失败</span>
@@ -755,7 +801,7 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
             <div className="vc-shot-info">
               <div className="vc-shot-meta">
                 <span className="vc-shot-num">{i + 1}</span>
-                <span className="vc-shot-tag">{beat.heading}</span>
+                <span className="vc-shot-tag">{displayBeatHeading(beat.heading, i)}</span>
                 <span className="vc-shot-dur">{beat.duration}s</span>
               </div>
               {editingId === beat.id ? (
@@ -784,6 +830,7 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
                 type="button"
                 onClick={() => onRegenerateBeat(beat.id)}
                 title="重新生成文案"
+                aria-label={`重新生成第 ${i + 1} 个镜头文案`}
                 disabled={beat.status === "generating"}
               >
                 <RefreshCw size={13} />
@@ -792,6 +839,7 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
                 type="button"
                 onClick={() => onGenerateClip(beat.id)}
                 title="生成该镜头视频"
+                aria-label={`生成第 ${i + 1} 个镜头视频`}
                 disabled={beat.status === "generating"}
               >
                 <Film size={13} />
@@ -800,6 +848,7 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
                 type="button"
                 onClick={() => onDeleteBeat(beat.id)}
                 title="删除镜头"
+                aria-label={`删除第 ${i + 1} 个镜头`}
                 className="vc-shot-delete-btn"
               >
                 <Trash2 size={13} />
@@ -846,7 +895,7 @@ interface ProjectCanvasViewProps {
 }
 
 function ProjectCanvasView({ project, stage, editingBeatId, loading, onEditBeat, onUpdateBeat, onUpdateBeatFields, onRegenerateBeat, onAddRef, onUpdateProject }: ProjectCanvasViewProps) {
-  const completedCount = project.storyBeats.filter((b) => b.status === "done").length;
+  const completedCount = project.storyBeats.filter((b) => b.status === "generated").length;
   const isCanvas = stage === "canvas";
   const isGenerating = stage === "generating";
 
@@ -979,16 +1028,16 @@ function ProjectCanvasView({ project, stage, editingBeatId, loading, onEditBeat,
               <div className="vc-beat-header">
                 <div className="vc-beat-num">{i + 1}</div>
                 <div className="vc-beat-info">
-                  <span className="vc-beat-heading">{beat.heading}</span>
+                  <span className="vc-beat-heading">{displayBeatHeading(beat.heading, i)}</span>
                   {beat.status === "generating" && (
                     <Loader2 size={13} className="vc-spin vc-beat-loading" />
                   )}
-                  {beat.status === "done" && (
+                  {beat.status === "generated" && (
                     <Check size={13} className="vc-beat-done-icon" />
                   )}
                   <span className="vc-beat-duration">{beat.duration}s</span>
                 </div>
-                {beat.status === "done" && (
+                {beat.status === "generated" && (
                   <div className="vc-beat-actions">
                     <button
                       type="button"
@@ -1082,6 +1131,7 @@ export default function AgentDock({ children }: AgentDockProps) {
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const vcFileInputRef = useRef<HTMLInputElement>(null);
+  const vcCanvasRightRef = useRef<HTMLDivElement>(null);
 
   // ── Sidebar collapse state ──────────────────────────────────────────────────
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1125,6 +1175,14 @@ export default function AgentDock({ children }: AgentDockProps) {
       setSidebarCollapsed(true);
     }
   }, [videoCreationMode, vcStage]);
+
+  useEffect(() => {
+    if (!vcProject?.storyBeats.length || vcStage !== "canvas" || vcLoading) return;
+    const container = vcCanvasRightRef.current;
+    const beats = container?.querySelector(".vc-beats-list") as HTMLElement | null;
+    if (!container || !beats) return;
+    container.scrollTo({ top: Math.max(0, beats.offsetTop - 24), behavior: "smooth" });
+  }, [vcProject?.storyBeats.length, vcStage, vcLoading]);
 
   useEffect(() => {
     if (!skillMenuOpen) return;
@@ -1358,7 +1416,11 @@ export default function AgentDock({ children }: AgentDockProps) {
           if (toolResult?.type === "edit_storyboard" && toolResult.newText) {
             try {
               const newBeats = JSON.parse(toolResult.newText);
-              if (Array.isArray(newBeats)) setVcProject((prev) => prev ? { ...prev, storyBeats: newBeats.map((b: any, i: number) => ({ ...b, status: "pending", order: i })) } : null);
+              if (Array.isArray(newBeats)) {
+                setVcProject((prev) =>
+                  prev ? { ...prev, storyBeats: newBeats.map(normalizeStoryBeatFromAgent) } : null,
+                );
+              }
             } catch {}
           }
         },
@@ -1530,7 +1592,23 @@ export default function AgentDock({ children }: AgentDockProps) {
         aspectRatio: vcForm.aspectRatio,
         userPrompt: vcForm.description,
       }, (msg, state) => { 
-        if (msg) setVcProgressMsg(msg); 
+        if (msg) {
+          setVcProgressMsg(msg);
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === currentConversationId
+                ? {
+                    ...c,
+                    messages: c.messages.map((m) =>
+                      m.id === genMsgId
+                        ? { ...m, text: `AI 正在生成：${msg}` }
+                        : m,
+                    ),
+                  }
+                : c,
+            ),
+          );
+        }
         
         // 实时更新分析和脚本进度到 Summary
         if (state) {
@@ -1592,20 +1670,24 @@ export default function AgentDock({ children }: AgentDockProps) {
           ),
         );
       } else {
+        const message = "后端没有返回有效分镜。请检查 Ark 文本模型返回格式或稍后重试。";
+        setOutlineError(message);
         setConversations((prev) =>
           prev.map((c) =>
             c.id === currentConversationId
-              ? { ...c, messages: c.messages.map((m) => m.id === genMsgId ? { ...m, text: `已用预设分镜方案，你可以告诉我如何调整。` } : m) }
+              ? { ...c, messages: c.messages.map((m) => m.id === genMsgId ? { ...m, text: `生成失败：${message}` } : m) }
               : c,
           ),
         );
       }
     } catch (e: any) {
       console.error("Background generation error:", e);
+      const message = e?.message || "AI 生成请求失败";
+      setOutlineError(message);
       setConversations((prev) =>
         prev.map((c) =>
           c.id === currentConversationId
-            ? { ...c, messages: c.messages.map((m) => m.id === genMsgId ? { ...m, text: `使用预设分镜方案（AI 生成失败：${e.message}），你可以在下方继续调整。` } : m) }
+            ? { ...c, messages: c.messages.map((m) => m.id === genMsgId ? { ...m, text: `生成失败：${message}` } : m) }
             : c,
         ),
       );
@@ -1617,12 +1699,12 @@ export default function AgentDock({ children }: AgentDockProps) {
   const generateClip = async (prompt, imageUrl, ratio, duration) => {
     try {
       const createRes = (await api.agentGenerateClip({ prompt, imageUrl, ratio, duration })) as any;
-      if (!createRes.success || !createRes.taskId) {
+      const taskId = createRes?.data?.taskId || createRes?.taskId;
+      if (!createRes.success || !taskId) {
         console.error("Generate failed:", createRes);
         return null;
       }
-      
-      const taskId = createRes.taskId;
+
       while (true) {
         await new Promise(r => setTimeout(r, 5000));
         const statusRes = await api.agentGenerateClipStatus(taskId);
@@ -1659,7 +1741,7 @@ export default function AgentDock({ children }: AgentDockProps) {
               updatedAt: "刚刚",
               messages: [
                 ...c.messages,
-                { id: Date.now(), role: "agent" as const, text: `🎬 分镜规划完成！${vcProject.storyBeats.length} 个分镜已就绪。你可以继续调整分镜描述，或点击卡片上的“生成该镜头视频”进行渲染。` },
+                { id: Date.now(), role: "agent" as const, text: `🎬 已进入分镜调整。${vcProject.storyBeats.length} 个分镜已就绪，你可以继续调整文案，或点击每张卡片右上角的“生成该镜头视频”按钮进行渲染。` },
               ],
             }
           : c,
@@ -1669,14 +1751,23 @@ export default function AgentDock({ children }: AgentDockProps) {
 
   const handleRegenerateBeat = async (beatId: string) => {
     if (!vcProject) return;
-    // Just mock text regeneration for now since backend doesn't have partial generation
-    setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beatId ? { ...b, description: "【重新生成】" + b.description } : b)) } : null);
+    setVcProject((prev) =>
+      prev
+        ? {
+            ...prev,
+            storyBeats: prev.storyBeats.map((b) =>
+              b.id === beatId
+                ? { ...b, errorMessage: "请在左侧对话框描述修改要求，Agent 会基于当前分镜更新文案。", status: "failed" }
+                : b,
+            ),
+          }
+        : null,
+    );
   };
 
   const handleGenerateClipBeat = async (beatId: string) => {
     if (!vcProject) return;
     
-    // Attempt to check if mock is enabled by trying to fetch a mock status or just by alerting in case it returns mock paths
     const beat = vcProject.storyBeats.find(b => b.id === beatId);
     if (!beat) return;
 
@@ -1685,11 +1776,6 @@ export default function AgentDock({ children }: AgentDockProps) {
     const imageUrl = vcProject.visualRefs?.[0]?.url || "";
     const videoUrl = await generateClip(beat.description, imageUrl, vcProject.aspectRatio, beat.duration || 5);
     const isRealVideo = isPlayableVideoUrl(videoUrl);
-    
-    if (!isRealVideo && videoUrl) {
-      // Mock returned a non-real video URL (like /uploads/mock/...)
-      alert("当前为 mock 模式，不会真实调用视频模型。请设置 ARK_MOCK=false 后重启后端。");
-    }
 
     setVcProject((prev) =>
       prev ? {
@@ -1698,8 +1784,9 @@ export default function AgentDock({ children }: AgentDockProps) {
             b.id === beatId
               ? {
                   ...b,
-                  status: isRealVideo ? "generated" : "mock_ready",
+                  status: isRealVideo ? "generated" : "failed",
                   videoClipUrl: isRealVideo ? (videoUrl as string) : undefined,
+                  errorMessage: isRealVideo ? undefined : "视频模型没有返回可播放的视频 URL，请检查 Ark 视频模型配置或任务状态。",
                 }
               : b
           )
@@ -1760,7 +1847,7 @@ export default function AgentDock({ children }: AgentDockProps) {
               const newBeats = JSON.parse(toolResult.newText);
               if (Array.isArray(newBeats) && newBeats.length > 0) {
                 setVcProject((prev) =>
-                  prev ? { ...prev, storyBeats: newBeats.map((b: any, i: number) => ({ id: b.id || `shot-${i+1}`, order: i, heading: b.heading || `分镜${i+1}`, description: b.description || "", duration: b.duration || 5, status: "pending" as const })) } : null
+                  prev ? { ...prev, storyBeats: newBeats.map(normalizeStoryBeatFromAgent) } : null
                 );
               }
             } catch(e) { console.warn("beats parse fail", e); }
@@ -1996,7 +2083,7 @@ export default function AgentDock({ children }: AgentDockProps) {
               {vcStage === "canvas" && (
                 <button type="button" className="vc-generate-btn" onClick={handleStartGeneration}>
                   <Zap size={16} />
-                  开始生成
+                  查看并调整分镜
                 </button>
               )}
 
@@ -2053,7 +2140,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                 </form>
               )}
               </div>
-              <div className="agent-canvas-right">
+              <div className="agent-canvas-right" ref={vcCanvasRightRef}>
                 {vcStage === "storyboard" ? (
                 <StoryboardAdjustView
                   project={vcProject}

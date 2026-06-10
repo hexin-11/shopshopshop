@@ -55,6 +55,10 @@ const GraphState = {
     value: (x, y) => (y ? y : x),
     default: () => null,
   },
+  videoTaskError: {
+    value: (x, y) => (y ? y : x),
+    default: () => null,
+  },
 };
 
 // === Helper to get LangChain Model ===
@@ -158,21 +162,27 @@ async function createVideoTaskNode(state) {
   // doubao-seedance-1-5-pro only accepts specific duration values (e.g. 5)
   const duration = 5;
   
-  // Submit asynchronous task
-  const task = await createVideoTask({
-    prompt: firstPrompt,
-    duration,
-    ratio: "9:16",
-    generateAudio: true,
-  });
+  let task = null;
+  let videoTaskError = null;
+  try {
+    task = await createVideoTask({
+      prompt: firstPrompt,
+      duration,
+      ratio: "9:16",
+      generateAudio: true,
+    });
+  } catch (error) {
+    videoTaskError = error?.message || "视频任务提交失败";
+  }
 
   const previewResult = {
-    taskId: task.taskId,
-    status: task.status, // queued
+    taskId: task?.taskId || null,
+    status: task?.status || "not_submitted",
     progress: 0,
     previewUrl: null,
     exportUrl: null,
-    mock: task.mock,
+    mock: task?.mock || false,
+    error: videoTaskError,
     checks: {
       subtitle: timeline.tracks.subtitle.length > 0,
       voiceover: timeline.tracks.voiceover.length > 0,
@@ -185,10 +195,11 @@ async function createVideoTaskNode(state) {
 
   return {
     timeline,
-    taskId: task.taskId,
-    taskStatus: task.status,
+    taskId: task?.taskId || null,
+    taskStatus: task?.status || "not_submitted",
     task,
     previewResult,
+    videoTaskError,
   };
 }
 
@@ -224,7 +235,11 @@ export async function runAgentGraphStream(input, onProgress) {
       case "generateScript": progressMsg = "成功撰写短视频带货脚本"; break;
       case "generateStoryboard": progressMsg = "已将脚本拆解为具体的视频分镜"; break;
       case "generateVideoPrompt": progressMsg = "完成各分镜的视觉生成提示词构建"; break;
-      case "submitVideoTask": progressMsg = "视频合成任务已成功下发到云端"; break;
+      case "submitVideoTask":
+        progressMsg = nodeState.videoTaskError
+          ? "脚本和分镜已完成，视频任务暂未提交成功"
+          : "视频合成任务已成功下发到云端";
+        break;
     }
 
     if (onProgress && progressMsg) {
