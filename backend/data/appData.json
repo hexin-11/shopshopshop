@@ -44,6 +44,20 @@
   ],
   "products": [
     {
+      "id": "prod-8c2ce756-149d-4cb2-a0c3-8f23dc99878d",
+      "name": "新商品",
+      "brand": "未填写品牌",
+      "category": "未分类",
+      "assetCount": 4,
+      "scriptCount": 0,
+      "projectCount": 0,
+      "status": "制作中",
+      "updatedAt": "刚刚",
+      "mainImage": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
+      "description": "",
+      "createdAt": "2026-06-10T12:32:51.902Z"
+    },
+    {
       "id": "prod-85a7fa2f-e873-46c6-8599-439b349382d8",
       "name": "Havit H630BT Wireless Headphones",
       "brand": "Havit",
@@ -561,6 +575,12 @@
       "action": "product.create",
       "targetId": "prod-85a7fa2f-e873-46c6-8599-439b349382d8",
       "createdAt": "2026-06-10T12:13:41.023Z"
+    },
+    {
+      "id": "audit-2773fd79-ec0a-422b-a293-2685451f3291",
+      "action": "product.create",
+      "targetId": "prod-8c2ce756-149d-4cb2-a0c3-8f23dc99878d",
+      "createdAt": "2026-06-10T12:32:51.902Z"
     }
   ]
 }
