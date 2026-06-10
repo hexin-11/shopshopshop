@@ -44,6 +44,20 @@
   ],
   "products": [
     {
+      "id": "prod-85a7fa2f-e873-46c6-8599-439b349382d8",
+      "name": "Havit H630BT Wireless Headphones",
+      "brand": "Havit",
+      "category": "Headphones",
+      "assetCount": 4,
+      "scriptCount": 0,
+      "projectCount": 0,
+      "status": "制作中",
+      "updatedAt": "刚刚",
+      "mainImage": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
+      "description": "Great headphones with long battery life.",
+      "createdAt": "2026-06-10T12:13:41.023Z"
+    },
+    {
       "id": "prod-earphone",
       "name": "Havit H630BT 主动降噪耳机",
       "brand": "Havit",
@@ -541,6 +555,12 @@
       "conversion": "3.1%"
     }
   ],
-  "auditLogs": []
+  "auditLogs": [
+    {
+      "id": "audit-c9fea0e6-702c-4e75-9207-e112d2a4f802",
+      "action": "product.create",
+      "targetId": "prod-85a7fa2f-e873-46c6-8599-439b349382d8",
+      "createdAt": "2026-06-10T12:13:41.023Z"
+    }
+  ]
 }
-

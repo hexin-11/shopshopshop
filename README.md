@@ -23,7 +23,7 @@
 
 > **💡 评委请注意：** 以下视频展示了在无网络/无真实模型 API Key 环境下，通过系统内置的 Mock 引擎完美跑通“商品输入 -> 多 Agent 分析流 -> 视频生成任务编排 -> 结果预览”的全链路闭环过程。
 
-[🎬 点击此处观看全链路演示视频 (demo_recording.mp4)](./demo_recording.mp4)
+[🎬 点击此处观看全链路演示视频 (demo_recording_full.webm)](./demo_recording_full.webm)
 
 - **README / 运行说明**：请参阅下方的 [本地环境启动指南](#本地环境启动指南)。
 
