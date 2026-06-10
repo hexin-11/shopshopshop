@@ -1,33 +1,6 @@
-import {
-  assets as fallbackAssets,
-  catalog as fallbackProducts,
-  dashboardMetrics,
-  jobs as fallbackJobs,
-  members as fallbackMembers,
-  platformPerformance,
-  productScripts as fallbackProductScripts,
-  projects as fallbackProjects,
-  user as fallbackUser,
-} from "../data/mockData";
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
 
 type QueryValue = string | number | boolean | null | undefined;
-
-const LOCAL_PRODUCTS_KEY = "vibegen-local-products";
-
-function readLocalProducts() {
-  try {
-    return JSON.parse(window.localStorage.getItem(LOCAL_PRODUCTS_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalProduct(product: Record<string, unknown>) {
-  const products = readLocalProducts();
-  window.localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify([product, ...products]));
-}
 
 function buildPath(path: string, query?: Record<string, QueryValue>) {
   const url = new URL(path, API_BASE);
@@ -51,79 +24,45 @@ async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
   return json as T;
 }
 
-async function getWithFallback<T>(path: string, fallback: T, query?: Record<string, QueryValue>): Promise<T> {
-  try {
-    return await requestJson<T>(buildPath(path, query));
-  } catch {
-    return fallback;
-  }
-}
-
 function pageItems<T>(value: { items?: T[] } | T[]): T[] {
   return Array.isArray(value) ? value : value.items || [];
 }
 
 export const api = {
   async currentUser() {
-    return getWithFallback("/api/users/current", fallbackUser);
+    return requestJson("/api/users/current");
   },
 
   async members() {
-    return getWithFallback("/api/members", fallbackMembers);
+    return requestJson("/api/members");
   },
 
   async dashboard() {
-    return getWithFallback("/api/dashboard", {
-      metrics: dashboardMetrics,
-      activeJobs: fallbackJobs.filter((job) => job.type === "generating"),
-      recentProducts: fallbackProducts.slice(0, 5),
-      platformPerformance,
-    });
+    return requestJson("/api/dashboard");
   },
 
   async products(query?: { keyword?: string; category?: string; sortBy?: string }) {
-    const fallback = { items: [...fallbackProducts] as any[] };
-    const remoteItems = pageItems(await getWithFallback("/api/products", fallback, { ...query, pageSize: 100 }));
-    const localItems = readLocalProducts();
-    return [...localItems, ...remoteItems.filter((item: any) => !localItems.some((local: any) => local.id === item.id))];
+    const res = await requestJson<any>("/api/products", { method: "GET" });
+    return pageItems(res);
   },
 
   async product(id: string) {
-    const localProduct = readLocalProducts().find((item: any) => item.id === id);
-    return localProduct || getWithFallback(`/api/products/${id}`, fallbackProducts.find((item) => item.id === id) || fallbackProducts[0]);
+    return requestJson(`/api/products/${id}`);
   },
 
   async createProduct(payload: Record<string, unknown>) {
-    try {
-      return await requestJson("/api/products", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      const product = {
-        id: `prod-${Date.now()}`,
-        name: payload.name || "新商品",
-        brand: payload.brand || "",
-        category: payload.category || "未分类",
-        description: payload.description || "",
-        mainImage: payload.mainImage || "",
-        assetCount: payload.assetCount || 0,
-        scriptCount: payload.scriptCount || 0,
-        projectCount: payload.projectCount || 0,
-        status: "制作中",
-        updatedAt: "刚刚",
-      };
-      saveLocalProduct(product);
-      return product;
-    }
+    return requestJson("/api/products", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   async productAssets(productId: string) {
-    return getWithFallback(`/api/products/${productId}/assets`, fallbackAssets);
+    return requestJson(`/api/products/${productId}/assets`);
   },
 
   async productScripts(productId: string) {
-    return getWithFallback(`/api/products/${productId}/scripts`, fallbackProductScripts[productId] || []);
+    return requestJson(`/api/products/${productId}/scripts`);
   },
 
   async createProductScript(productId: string, payload: Record<string, unknown>) {
@@ -134,7 +73,8 @@ export const api = {
   },
 
   async projects() {
-    return pageItems(await getWithFallback("/api/projects", { items: fallbackProjects as any[] }, { pageSize: 100 }));
+    const res = await requestJson<any>("/api/projects");
+    return pageItems(res);
   },
 
   async createProject(payload: Record<string, unknown>) {
@@ -145,7 +85,8 @@ export const api = {
   },
 
   async jobs(type?: string) {
-    return pageItems(await getWithFallback("/api/jobs", { items: fallbackJobs as any[] }, { type, pageSize: 100 }));
+    const res = await requestJson<any>(`/api/jobs${type ? `?type=${type}` : ''}`);
+    return pageItems(res);
   },
 
   async createJob(payload: Record<string, unknown>) {
@@ -258,7 +199,7 @@ export const api = {
     });
   },
 
-  async agentChatStream(payload: { messages: any[], context: any }, onProgress: (msg: string, toolCall: any, toolResult: any) => void) {
+  async agentChatStream(payload: any, onProgress: (msg: string, toolCall: any, toolResult: any) => void) {
     const response = await fetch(buildPath("/api/agent/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -306,7 +247,14 @@ export const api = {
         try {
           const data = JSON.parse(dataMatch[1].trim());
           if (type === "message") {
-            onProgress(data.text, null, null);
+            onProgress(data.text || "", null, null);
+          } else if (type === "done") {
+            // Final event: dispatch any storyboard changes as toolResult
+            if (data.changes && Array.isArray(data.changes)) {
+              for (const change of data.changes) {
+                onProgress("", null, change);
+              }
+            }
           } else if (type === "tool_call") {
             onProgress("", data.call, null);
           } else if (type === "tool_result") {

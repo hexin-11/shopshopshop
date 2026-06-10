@@ -108,6 +108,69 @@ export async function generateText(options, env = process.env) {
   };
 }
 
+// Async generator – streams raw token strings from Ark (SSE)
+export async function* generateTextStream(options, env = process.env) {
+  const config = getArkConfig(env);
+
+  if (config.mock) {
+    const text = `这是 Mock 流式回复，收到输入：${
+      [...(options.messages || [])].reverse().find(m => m.role === "user")?.content?.slice(0, 30) || ""
+    }`;
+    for (const char of text) {
+      yield char;
+      await new Promise(r => setTimeout(r, 18));
+    }
+    return;
+  }
+
+  requireConfig(config, ["textApiKey", "textEndpoint", "textModel"]);
+
+  const response = await fetch(config.textEndpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.textApiKey}`,
+    },
+    body: JSON.stringify({
+      model: config.textModel,
+      messages: options.messages,
+      temperature: options.temperature ?? 0.6,
+      stream: true,
+      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new ArkClientError(safeErrorMessage("Ark stream", response.status, errText), {
+      status: response.status,
+      code: "ARK_TEXT_REQUEST_FAILED",
+    });
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (raw === "[DONE]") return;
+      try {
+        const parsed = JSON.parse(raw);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) yield content;
+      } catch { /* skip malformed chunk */ }
+    }
+  }
+}
+
 export async function createVideoTask(options, env = process.env) {
   const config = getArkConfig(env);
 

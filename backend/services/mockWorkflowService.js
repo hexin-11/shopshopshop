@@ -1,4 +1,5 @@
-import { mockMaterials, mockTasks } from "../data/mockAigcData.js";
+const mockMaterials = [];
+const mockTasks = new Map();
 import { createMockId, normalizeProductInput } from "../utils/aigcResponse.js";
 
 function splitDuration(duration, count) {

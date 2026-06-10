@@ -1,4 +1,4 @@
-﻿import { createServer } from "node:http";
+import { createServer } from "node:http";
 import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { extname, join, basename } from "node:path";
@@ -10,7 +10,6 @@ import { createDatabaseAppStore } from "./storage/databaseAppStore.js";
 import { createJsonAssetStore } from "./storage/jsonAssetStore.js";
 import { createJsonAppStore } from "./storage/jsonAppStore.js";
 import { createJsonAgentStore } from "./storage/jsonAgentStore.js";
-import { runAgentChat } from "./agent/chatAgent.js";
 import { loadEnvFile } from "./config/env.js";
 import { handleAigcRoutes } from "../routes/aigcRoutes.js";
 import { createVideoTask, getVideoTask, ArkClientError } from "../services/arkClient.js";
@@ -389,29 +388,6 @@ async function handleApi(req, res) {
     return sendJson(res, 200, { items: await listAgentConversations(), store: agentStore.name });
   }
 
-  if (pathname === "/api/agent/chat" && req.method === "POST") {
-    let payload;
-    try {
-      payload = await readBody(req);
-    } catch (error) {
-      return badRequest(res, error.message);
-    }
-
-    if (!payload.message && !payload.attachments?.length) {
-      return badRequest(res, "message 或 attachments 必填");
-    }
-
-    try {
-      const result = await runAgentChat(payload);
-      const conversation = await saveAgentExchange(payload, result);
-      return sendJson(res, 200, { ...result, conversation });
-    } catch (error) {
-      return sendJson(res, error.statusCode || 500, {
-        message: error.message || "Agent 暂时无法回复",
-        details: error.details,
-      });
-    }
-  }
 
   if (pathname === "/api/dashboard" && req.method === "GET") {
     return sendJson(res, 200, buildDashboard(await readAppData()));

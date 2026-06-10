@@ -104,7 +104,9 @@ export async function handleAigcRoutes({ req, res, pathname, searchParams, readB
       sendJson(res, 400, { success: false, message: body.__invalidJson });
       return true;
     }
-    return execute(chatAgentController, { body, req, res });
+    // chatAgentController owns its own SSE response — bypass execute()
+    await chatAgentController({ body, req, res });
+    return true;
   }
 
   return false;

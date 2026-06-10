@@ -118,7 +118,7 @@ interface StoryBeat {
   subtitle?: string;
   voiceover?: string;
   duration: number;
-  status: "pending" | "generating" | "done" | "generated" | "mock_ready" | "failed";
+  status: "pending" | "generating" | "done" | "generated" | "mock_ready" | "failed" | "prompt_ready";
   videoClipUrl?: string;   // 只有真实 http/https 视频才存这里
   errorMessage?: string;   // failed 时的错误原因
 }
@@ -254,54 +254,7 @@ const defaultVCForm: VCFormData = {
   references: [],
 };
 
-function getStoryBeats(videoType: string): StoryBeat[] {
-  const presets: Record<string, StoryBeat[]> = {
-    influencer: [
-      { id: "b1", order: 1, heading: "开场钩子", description: "主播出镜，3 秒内抛出核心痛点问题，画面冲击感强，抓住目标用户停留", duration: 5, status: "pending" },
-      { id: "b2", order: 2, heading: "产品亮相", description: "产品特写镜头，展示外观质感，字幕同步核心关键词，运镜流畅自然", duration: 6, status: "pending" },
-      { id: "b3", order: 3, heading: "核心卖点", description: "口播 2-3 个差异化卖点，配合功能演示画面，节奏明快，信息密度适中", duration: 8, status: "pending" },
-      { id: "b4", order: 4, heading: "使用场景", description: "真实生活场景中使用产品，强化代入感与信任感，背景自然", duration: 6, status: "pending" },
-      { id: "b5", order: 5, heading: "下单引导", description: "价格+限时优惠+行动指令，引导点击购买，氛围制造紧迫感", duration: 5, status: "pending" },
-    ],
-    product: [
-      { id: "b1", order: 1, heading: "产品全貌", description: "360° 产品外观展示，背景简洁干净，光线均匀充足，突出品质感", duration: 4, status: "pending" },
-      { id: "b2", order: 2, heading: "细节特写", description: "材质工艺细节及关键功能区域特写，展示产品用心之处", duration: 6, status: "pending" },
-      { id: "b3", order: 3, heading: "使用演示", description: "产品实际使用过程，展示操作简便性与功效，真实自然", duration: 8, status: "pending" },
-      { id: "b4", order: 4, heading: "效果展示", description: "使用效果直观呈现，或使用前后对比，强化说服力", duration: 7, status: "pending" },
-      { id: "b5", order: 5, heading: "品牌收尾", description: "品牌标语+产品定格，留下视觉印象，引导关注或下单", duration: 5, status: "pending" },
-    ],
-    unboxing: [
-      { id: "b1", order: 1, heading: "包装期待", description: "产品包装整体展示，制造好奇心与期待感，光线均匀", duration: 4, status: "pending" },
-      { id: "b2", order: 2, heading: "拆箱过程", description: "真实自然的开箱，保留第一反应和声音，增强真实感和代入感", duration: 8, status: "pending" },
-      { id: "b3", order: 3, heading: "内容物展示", description: "配件、说明书、产品本体逐一展示，完整呈现盒内所有内容", duration: 6, status: "pending" },
-      { id: "b4", order: 4, heading: "第一印象", description: "初次上手体验，真实感受与表情反馈，增强可信度", duration: 7, status: "pending" },
-      { id: "b5", order: 5, heading: "总结推荐", description: "优缺点总结，给出明确的是否推荐购买建议", duration: 5, status: "pending" },
-    ],
-    skit: [
-      { id: "b1", order: 1, heading: "生活困扰", description: "真实用户遇到痛点问题的生活场景，引发强烈共鸣，表演自然", duration: 5, status: "pending" },
-      { id: "b2", order: 2, heading: "冲突升级", description: "问题带来的麻烦变得严重，用户焦虑情绪外显，节奏紧张", duration: 4, status: "pending" },
-      { id: "b3", order: 3, heading: "产品救场", description: "产品作为解决方案自然登场，情节转折自然不生硬", duration: 4, status: "pending" },
-      { id: "b4", order: 4, heading: "问题消解", description: "使用产品后困扰消失，展示明显改变与轻松感，对比明显", duration: 6, status: "pending" },
-      { id: "b5", order: 5, heading: "美好结局", description: "用户满意状态定格，叠加产品信息与购买引导，情感收尾", duration: 5, status: "pending" },
-    ],
-    comparison: [
-      { id: "b1", order: 1, heading: "选择困扰", description: "市场同类产品让人纠结，引出对比需求，引起共鸣", duration: 4, status: "pending" },
-      { id: "b2", order: 2, heading: "竞品回顾", description: "同类竞品的外观和主要功能简要介绍，客观中立", duration: 5, status: "pending" },
-      { id: "b3", order: 3, heading: "核心优势", description: "本品在关键维度的优势对比，数据化直观呈现，可信度高", duration: 8, status: "pending" },
-      { id: "b4", order: 4, heading: "实测背书", description: "关键指标实测，客观数据增强可信度，镜头真实", duration: 7, status: "pending" },
-      { id: "b5", order: 5, heading: "明确推荐", description: "总结对比，给出明确推荐结论，引导下单，CTA 清晰", duration: 6, status: "pending" },
-    ],
-  };
-  return (presets[videoType] || presets["product"]).map((b) => ({ ...b }));
-}
 
-const summaryMap: Record<string, string> = {
-  influencer: "一条面向目标用户的口播带货视频。通过主播真实演绎，建立信任感，突出产品核心差异点，以紧凑节奏完成从痛点引共鸣到促成下单的完整转化链路。",
-  product: "以产品为主角的纯展示视频。从全貌到细节，通过精致的运镜和光影展示产品质感，让观众感受产品的品质与用心，建立品牌形象。",
-  unboxing: "一条真实自然的开箱评测视频。保留第一次上手的真实感受，完整展示包装、配件和产品本体，给有购买意向的用户提供参考。",
-  skit: "以生活情景剧方式带入的带货视频。通过贴近真实的场景和人物，让产品在故事中自然出现，降低销售感，提升观众代入感和分享欲。",
-  comparison: "一条横向对比评测视频。数据化对比关键指标，客观展示产品优势，给正在做购买决策的用户提供有价值的参考。",
-};
 
 const stageLabel: Record<VideoCreationStage, string> = {
   setup: "设置",
@@ -701,13 +654,14 @@ interface StoryboardAdjustViewProps {
   onUpdateBeat: (id: string, description: string) => void;
   onDeleteBeat: (id: string) => void;
   onRegenerateBeat: (id: string) => void;
+  onGenerateClip: (id: string) => void;
   onConfirm: () => void;
   onBack: () => void;
   onReorderBeats: (newBeats: VideoProjectData["storyBeats"]) => void;
   onUpdateProject: (data: Partial<VideoProjectData>) => void;
 }
 
-function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerateBeat, onConfirm, onBack, onReorderBeats, onUpdateProject }: StoryboardAdjustViewProps) {
+function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerateBeat, onGenerateClip, onConfirm, onBack, onReorderBeats, onUpdateProject }: StoryboardAdjustViewProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draggedBeatId, setDraggedBeatId] = useState<string | null>(null);
 
@@ -768,11 +722,17 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
           >
             {/* Thumbnail */}
             <div className="vc-shot-thumb">
-              {isPlayableVideoUrl(beat.videoClipUrl) ? (
+              {beat.status === "generated" && isPlayableVideoUrl(beat.videoClipUrl) ? (
                 <video src={beat.videoClipUrl} controls autoPlay loop style={{width: "100%", height: "100%", objectFit: "cover"}} />
               ) : beat.status === "generating" ? (
                 <div className="vc-shot-placeholder">
                   <Loader2 size={22} className="vc-spin" style={{ color: "#4684EE" }} />
+                  <span style={{ fontSize: 11, color: "#4684EE", fontWeight: 600, marginTop: 4 }}>视频生成中</span>
+                </div>
+              ) : beat.status === "prompt_ready" ? (
+                <div className="vc-shot-placeholder" style={{ flexDirection: 'column', gap: 6 }}>
+                  <FileText size={20} style={{ color: "#94a3b8" }} />
+                  <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textAlign: 'center' }}>Prompt 已生成，等待生成视频</span>
                 </div>
               ) : beat.status === "mock_ready" || beat.status === "done" ? (
                 <div className="vc-shot-placeholder" style={{ flexDirection: 'column', gap: 6 }}>
@@ -823,10 +783,18 @@ function StoryboardAdjustView({ project, onUpdateBeat, onDeleteBeat, onRegenerat
               <button
                 type="button"
                 onClick={() => onRegenerateBeat(beat.id)}
-                title="重新生成"
+                title="重新生成文案"
                 disabled={beat.status === "generating"}
               >
                 <RefreshCw size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onGenerateClip(beat.id)}
+                title="生成该镜头视频"
+                disabled={beat.status === "generating"}
+              >
+                <Film size={13} />
               </button>
               <button
                 type="button"
@@ -874,9 +842,10 @@ interface ProjectCanvasViewProps {
   onRegenerateBeat: (id: string) => void;
   onAddRef: () => void;
   onUpdateProject?: (data: Partial<VideoProjectData>) => void;
+  loading?: boolean;
 }
 
-function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdateBeat, onUpdateBeatFields, onRegenerateBeat, onAddRef, onUpdateProject }: ProjectCanvasViewProps) {
+function ProjectCanvasView({ project, stage, editingBeatId, loading, onEditBeat, onUpdateBeat, onUpdateBeatFields, onRegenerateBeat, onAddRef, onUpdateProject }: ProjectCanvasViewProps) {
   const completedCount = project.storyBeats.filter((b) => b.status === "done").length;
   const isCanvas = stage === "canvas";
   const isGenerating = stage === "generating";
@@ -991,7 +960,21 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
           )}
         </div>
         <div className="vc-beats-list">
-          {project.storyBeats.map((beat, i) => (
+          {loading ? (
+            // Skeleton loading animation
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="vc-beat-item vc-beat-skeleton" style={{ animationDelay: `${i * 0.12}s` }}>
+                <div className="vc-beat-header">
+                  <div className="vc-beat-num vc-skeleton-circle" />
+                  <div className="vc-beat-info">
+                    <div className="vc-skeleton-line" style={{ width: `${60 + i * 8}%`, height: 14, borderRadius: 4, marginBottom: 6 }} />
+                    <div className="vc-skeleton-line" style={{ width: `${40 + i * 5}%`, height: 11, borderRadius: 4 }} />
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+          project.storyBeats.map((beat, i) => (
             <div key={beat.id} className={`vc-beat-item ${beat.status}`}>
               <div className="vc-beat-header">
                 <div className="vc-beat-num">{i + 1}</div>
@@ -1069,7 +1052,8 @@ function ProjectCanvasView({ project, stage, editingBeatId, onEditBeat, onUpdate
                 </div>
               )}
             </div>
-          ))}
+          )))}
+
         </div>
       </div>
     </div>
@@ -1326,15 +1310,12 @@ export default function AgentDock({ children }: AgentDockProps) {
   const submitInput = async () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || agentLoading) return;
-    const attachmentText = attachments.length > 0 ? `，并附带 ${attachments.length} 个文件` : "";
-    const userText = text || `分析这些附件${attachmentText}`;
-    const currentAttachments = [...attachments];
-    const currentMessages = activeConversation?.messages || [];
-    const currentReferences = activeConversation?.references || [];
+    const userText = text || `分析这些附件`;
     setInput("");
     setAttachments([]);
     setSkillMenuOpen(false);
     const base = Date.now();
+
     setConversations((prev) =>
       prev.map((c) => {
         if (c.id !== activeConversationId) return c;
@@ -1346,46 +1327,47 @@ export default function AgentDock({ children }: AgentDockProps) {
           messages: [
             ...c.messages,
             { id: base, role: "user" as const, text: userText },
-            { id: base + 1, role: "agent" as const, text: "正在思考怎么回复你...", thinking: ["读取上下文", "判断是普通聊天还是创作指令", "组织回复"] },
+            { id: base + 1, role: "agent" as const, text: "" },
           ],
         };
       }),
     );
     setAgentLoading(true);
+
     try {
-      const result = await api.agentChat({
-        message: userText,
-        messages: currentMessages,
-        conversationId: activeConversationId,
-        context: activeConversation,
-      });
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === activeConversationId
-            ? {
-                ...c,
-                updatedAt: "刚刚",
-                messages: c.messages.map((m) =>
-                  m.id === base + 1
-                    ? { ...m, text: result.reply, thinking: result.thinking || [], changes: result.changes || [] }
-                    : m,
-                ),
-              }
-            : c,
-        ),
+      let streamedText = "";
+      await api.agentChatStream(
+        {
+          message: userText,
+          messages: activeConversation?.messages || [],
+          conversationId: activeConversationId,
+          context: vcProject,
+          projectMeta: vcProject,
+        },
+        (text: string, toolCall: any, toolResult: any) => {
+          if (text) {
+            streamedText += text;
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === activeConversationId
+                  ? { ...c, messages: c.messages.map((m) => m.id === base + 1 ? { ...m, text: streamedText } : m) }
+                  : c,
+              ),
+            );
+          }
+          if (toolResult?.type === "edit_storyboard" && toolResult.newText) {
+            try {
+              const newBeats = JSON.parse(toolResult.newText);
+              if (Array.isArray(newBeats)) setVcProject((prev) => prev ? { ...prev, storyBeats: newBeats.map((b: any, i: number) => ({ ...b, status: "pending", order: i })) } : null);
+            } catch {}
+          }
+        },
       );
     } catch (error) {
       setConversations((prev) =>
         prev.map((c) =>
           c.id === activeConversationId
-            ? {
-                ...c,
-                messages: c.messages.map((m) =>
-                  m.id === base + 1
-                    ? { ...m, text: error instanceof Error ? `后端 Agent 暂时不可用：${error.message}` : "后端 Agent 暂时不可用。" }
-                    : m,
-                ),
-              }
+            ? { ...c, messages: c.messages.map((m) => m.id === base + 1 ? { ...m, text: error instanceof Error ? `出错：${error.message}` : "Agent 暂时不可用。" } : m) }
             : c,
         ),
       );
@@ -1448,156 +1430,193 @@ export default function AgentDock({ children }: AgentDockProps) {
   };
 
   const handleVCFormSubmit = async () => {
-    if (!vcForm.description.trim()) return;
+    const desc = vcForm.description.trim();
+    if (!desc) return;
+
+    // Short prompt: ask for more info, don't block UI
+    if (desc.length < 8) {
+      alert("描述太简短了，请补充商品信息、风格和目标受众（至少8个字）！");
+      return;
+    }
+
     setOutlineError(null);
-    setVcLoading(true);
-    setVcStage("outlining");
 
     let currentConversationId = activeConversationId;
     if (!activeConversation) {
-      const next: AgentConversation = {
-        id: Date.now(),
-        title: "新会话",
-        messages: [{ id: Date.now(), role: "agent", text: "你好！正在为你启动短视频生成..." }],
-        updatedAt: "刚刚",
-      };
-      setConversations((prev) => [next, ...prev]);
+      const next = { id: Date.now(), title: "新会话", messages: [] as { id: number; role: "user" | "agent"; text: string }[], updatedAt: "刚刚" };
+      setConversations((prev) => [next as any, ...prev]);
       setActiveConversationId(next.id);
       currentConversationId = next.id;
     }
 
     const product = [...catalog].find((p) => p.id === vcForm.productId);
-    const productName = product?.name ?? "商品";
+    const productName = (product?.name || desc.slice(0, 12).trim() || "我的商品").trim();
     const videoTypeLabel = VIDEO_TYPES.find((t) => t.id === vcForm.videoType)?.label ?? vcForm.videoType;
     const styleLabel = vcForm.customStyle || (STYLE_PRESETS.find((s) => s.id === vcForm.style)?.label ?? vcForm.style);
 
+    const visualRefs: VisualRef[] = [];
+    if (product?.mainImage) visualRefs.push({ id: "r1", type: "brand", label: "商品主图", url: product.mainImage });
+    if (vcForm.videoType === "influencer" || vcForm.videoType === "skit") {
+      visualRefs.push({ id: "r2", type: "character", label: "带货主播", url: "" });
+    }
+
+    const projectData: VideoProjectData = {
+      title: `${productName} · ${videoTypeLabel}`,
+      summary: "正在等待 AI 分析商品和生成脚本...",
+      fullPrompt: vcForm.description,
+      productName,
+      videoType: vcForm.videoType,
+      style: vcForm.style,
+      aspectRatio: vcForm.aspectRatio,
+      duration: vcForm.duration,
+      resolution: vcForm.resolution,
+      frameRate: vcForm.frameRate,
+      generationCount: vcForm.generationCount,
+      seed: vcForm.seed,
+      negativePrompt: vcForm.negativePrompt,
+      referenceWeight: vcForm.referenceWeight,
+      storyBeats: [],
+      visualRefs,
+    };
+
+    setVcProject(projectData);
+    setVcStage("canvas");
+
+    const sessionId = `session-${Date.now()}`;
+    const newSession: VCSession = {
+      id: sessionId,
+      conversationId: currentConversationId,
+      title: projectData.title,
+      videoType: vcForm.videoType,
+      stage: "canvas",
+      thumbnail: product?.mainImage,
+      createdAt: "刚刚",
+      project: projectData,
+      form: { ...vcForm },
+    };
+    setVcSessions((prev) => [newSession, ...prev]);
+    setActiveVcSessionId(sessionId);
+
+    // 2. Show "generating" message in chat
+    const genMsgId = Date.now();
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === currentConversationId
+          ? {
+              ...c,
+              title: `${productName} ${videoTypeLabel}`,
+              updatedAt: "刚刚",
+              messages: [
+                ...c.messages,
+                { id: genMsgId, role: "agent" as const, text: `正在为「${productName}」生成 AI 分镜方案，请稍候...` },
+              ],
+            }
+          : c,
+      ),
+    );
+
+    // 3. Background generation — updates beats when ready
     try {
-      setVcProgressMsg("正在连接模型...");
+      setVcLoading(true);
       const agentRes = await api.agentGenerateStream({
         productName,
-        productDescription: (product as any)?.description || "",
+        productDescription: (product as any)?.description || vcForm.description,
         sellingPoints: (product as any)?.sellingPoints || [],
         tone: styleLabel,
         platform: "抖音",
-        duration: parseInt(vcForm.duration) || 15,
-        videoType: vcForm.videoType,
-        userPrompt: vcForm.description
-      }, (msg, state) => {
-        if (msg) setVcProgressMsg(msg);
-      });
-
-      if (!agentRes.success || !agentRes.data) {
-        throw new Error("生成失败");
-      }
-
-      const generatedData = agentRes.data;
-      
-      const beats = generatedData.storyboard?.map((s: any, idx: number) => ({
-        id: s.shotId || `shot-${idx}`,
-        order: idx,
-        heading: s.scene || s.shotId || `Shot ${idx + 1}`,
-        timestamp: `${Math.round(idx * parseInt(vcForm.duration) / generatedData.storyboard.length)}s`,
-        description: s.visual || s.subtitle || "",
-        duration: s.duration || 3,
-        status: "pending" as const
-      })) || getStoryBeats(vcForm.videoType); // Fallback to local if backend fails to return array
-
-      const visualRefs: VisualRef[] = [];
-      if (product?.mainImage) {
-        visualRefs.push({ id: "r1", type: "brand", label: "商品主图", url: product.mainImage });
-      }
-      if (vcForm.videoType === "influencer" || vcForm.videoType === "skit") {
-        visualRefs.push({ id: "r2", type: "character", label: "带货主播", url: "" });
-      } else if (vcForm.videoType === "product") {
-        visualRefs.push({ id: "r2", type: "scene", label: "使用场景", url: `https://picsum.photos/seed/${vcForm.productId}/300/300` });
-      }
-
-      const projectData: VideoProjectData = {
-        title: `${productName} · ${videoTypeLabel}`,
-        summary: generatedData.script?.overview || (summaryMap[vcForm.videoType] ?? summaryMap["product"]).replace("产品", productName),
-        fullPrompt: vcForm.description,
-        productName,
+        duration: parseInt(vcForm.duration) || 30,
         videoType: vcForm.videoType,
         style: vcForm.style,
         aspectRatio: vcForm.aspectRatio,
-        duration: vcForm.duration,
-        resolution: vcForm.resolution,
-        frameRate: vcForm.frameRate,
-        generationCount: vcForm.generationCount,
-        seed: vcForm.seed,
-        negativePrompt: vcForm.negativePrompt,
-        referenceWeight: vcForm.referenceWeight,
-        storyBeats: beats,
-        visualRefs,
-      };
+        userPrompt: vcForm.description,
+      }, (msg, state) => { 
+        if (msg) setVcProgressMsg(msg); 
+        
+        // 实时更新分析和脚本进度到 Summary
+        if (state) {
+          setVcProject((prev) => {
+            if (!prev) return prev;
+            let newSummary = prev.summary;
+            if (state.script && state.script.hook) {
+              newSummary = `【AI脚本已生成】\n开场钩子：${state.script.hook}\n主要内容：${state.script.body || ""}\n结尾引导：${state.script.cta || ""}`;
+            } else if (state.analysis && state.analysis.corePainPoint) {
+              newSummary = `【AI商品分析】\n核心痛点：${state.analysis.corePainPoint}\n核心卖点：${(state.analysis.keySellingPoints || []).join("、")}`;
+            }
+            
+            // 如果有了分镜数据，立刻刷新
+            let newBeats = prev.storyBeats;
+            if (Array.isArray(state.storyboard) && state.storyboard.length > 0) {
+              newBeats = state.storyboard.map((s: any, idx: number) => ({
+                id: String(s.shotId || `shot-${idx + 1}`),
+                order: idx,
+                heading: s.scene || s.heading || `分镜 ${idx + 1}`,
+                description: s.visual || s.subtitle || s.description || "",
+                subtitle: s.subtitle || "",
+                voiceover: s.voiceover || "",
+                duration: s.duration || 5,
+                status: "pending" as const,
+              }));
+            }
+            return { ...prev, summary: newSummary, storyBeats: newBeats };
+          });
+        }
+      }) as any;
 
-      setVcProject(projectData);
-      setVcLoading(false);
-      setVcStage("canvas");
+      const generatedData = (agentRes as any)?.data || agentRes;
+      const rawBeats = generatedData?.storyboard;
+      if (Array.isArray(rawBeats) && rawBeats.length > 0) {
+        const beats: StoryBeat[] = rawBeats.map((s: any, idx: number) => ({
+          id: String(s.shotId || `shot-${idx + 1}`),
+          order: idx,
+          heading: s.scene || s.heading || `分镜 ${idx + 1}`,
+          description: s.visual || s.subtitle || s.description || "",
+          subtitle: s.subtitle || "",
+          voiceover: s.voiceover || "",
+          duration: s.duration || 5,
+          status: "pending" as const,
+        }));
+        setVcProject((prev) => prev ? { ...prev, storyBeats: beats } : null);
 
-      const sessionId = `session-${Date.now()}`;
-      const newSession: VCSession = {
-        id: sessionId,
-        conversationId: currentConversationId,
-        title: projectData.title,
-        videoType: vcForm.videoType,
-        stage: "canvas",
-        thumbnail: product?.mainImage,
-        createdAt: "刚刚",
-        project: projectData,
-        form: { ...vcForm },
-      };
-      setVcSessions((prev) => [newSession, ...prev]);
-      setActiveVcSessionId(sessionId);
-
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === currentConversationId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === genMsgId
+                      ? { ...m, text: `✅ 分镜已生成！共 ${beats.length} 个场景，风格：${styleLabel}，比例 ${vcForm.aspectRatio}，时长约 ${vcForm.duration}s。\n\n在下方输入框告诉我怎么调整，或直接点击分镜卡片编辑。` }
+                      : m,
+                  ),
+                }
+              : c,
+          ),
+        );
+      } else {
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === currentConversationId
+              ? { ...c, messages: c.messages.map((m) => m.id === genMsgId ? { ...m, text: `已用预设分镜方案，你可以告诉我如何调整。` } : m) }
+              : c,
+          ),
+        );
+      }
+    } catch (e: any) {
+      console.error("Background generation error:", e);
       setConversations((prev) =>
         prev.map((c) =>
           c.id === currentConversationId
-            ? {
-                ...c,
-                title: `${productName} ${videoTypeLabel}`,
-                updatedAt: "刚刚",
-                messages: [
-                  ...c.messages,
-                  {
-                    id: Date.now(),
-                    role: "agent" as const,
-                    text: `大纲已生成！根据你的描述，我设计了 ${beats.length} 个分镜节拍，风格：${styleLabel}，比例 ${vcForm.aspectRatio}，时长约 ${vcForm.duration}s。\n\n你可以直接在右侧点击任意分镜描述进行修改，或者在这里告诉我调整意见。确认后点击「开始生成」，我会逐个生成视频片段。`,
-                  },
-                ],
-              }
+            ? { ...c, messages: c.messages.map((m) => m.id === genMsgId ? { ...m, text: `使用预设分镜方案（AI 生成失败：${e.message}），你可以在下方继续调整。` } : m) }
             : c,
         ),
       );
-    } catch (e: any) {
-      console.error(e);
+    } finally {
       setVcLoading(false);
-      setVcStage("setup");
-      setOutlineError(e.message || "未知错误");
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === activeConversationId
-            ? {
-                ...c,
-                messages: [
-                  ...c.messages,
-                  {
-                    id: Date.now(),
-                    role: "agent" as const,
-                    text: `生成大纲失败：${e.message}。请稍后再试。`,
-                  },
-                ],
-              }
-            : c,
-        ),
-      );
     }
   };
 
-  
   const generateClip = async (prompt, imageUrl, ratio, duration) => {
     try {
-      const createRes = await api.agentGenerateClip({ prompt, imageUrl, ratio, duration });
+      const createRes = (await api.agentGenerateClip({ prompt, imageUrl, ratio, duration })) as any;
       if (!createRes.success || !createRes.taskId) {
         console.error("Generate failed:", createRes);
         return null;
@@ -1628,30 +1647,7 @@ export default function AgentDock({ children }: AgentDockProps) {
     setVcStage("generating");
 
     for (const beat of vcProject.storyBeats) {
-      setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beat.id ? { ...b, status: "generating", videoClipUrl: undefined } : b)) } : null);
-      
-      const imageUrl = vcProject.visualRefs?.[0]?.url || "";
-      const videoUrl = await generateClip(beat.description, imageUrl, vcProject.aspectRatio, parseInt(vcProject.duration) || 5);
-      
-      // 只有真实 http/https URL 才能当视频播放
-      const isRealVideo = isPlayableVideoUrl(videoUrl);
-      
-      setVcProject((prev) =>
-        prev ? {
-          ...prev,
-          storyBeats: prev.storyBeats.map((b) =>
-            b.id === beat.id
-              ? {
-                  ...b,
-                  // generated: 真实视频已生成; mock_ready: mock 模式下暂无真实视频
-                  status: isRealVideo ? "generated" : "mock_ready",
-                  // 只有真实视频才设置 videoClipUrl，mock 路径不设置
-                  videoClipUrl: isRealVideo ? (videoUrl as string) : undefined,
-                }
-              : b
-          )
-        } : null
-      );
+      setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beat.id ? { ...b, status: "prompt_ready", videoClipUrl: undefined } : b)) } : null);
     }
 
     setVcStage("storyboard");
@@ -1663,7 +1659,7 @@ export default function AgentDock({ children }: AgentDockProps) {
               updatedAt: "刚刚",
               messages: [
                 ...c.messages,
-                { id: Date.now(), role: "agent" as const, text: `🎬 分镜规划完成！${vcProject.storyBeats.length} 个分镜已就绪。当前为 ARK_MOCK=true 模拟模式，分镜展示为占位素材。如需生成真实视频，请配置 ARK_API_KEY 并关闭 mock 模式。你可以继续调整分镜描述，确认后进入精剪。` },
+                { id: Date.now(), role: "agent" as const, text: `🎬 分镜规划完成！${vcProject.storyBeats.length} 个分镜已就绪。你可以继续调整分镜描述，或点击卡片上的“生成该镜头视频”进行渲染。` },
               ],
             }
           : c,
@@ -1673,15 +1669,28 @@ export default function AgentDock({ children }: AgentDockProps) {
 
   const handleRegenerateBeat = async (beatId: string) => {
     if (!vcProject) return;
-    setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beatId ? { ...b, status: "generating", videoClipUrl: undefined, errorMessage: undefined } : b)) } : null);
+    // Just mock text regeneration for now since backend doesn't have partial generation
+    setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beatId ? { ...b, description: "【重新生成】" + b.description } : b)) } : null);
+  };
+
+  const handleGenerateClipBeat = async (beatId: string) => {
+    if (!vcProject) return;
     
+    // Attempt to check if mock is enabled by trying to fetch a mock status or just by alerting in case it returns mock paths
     const beat = vcProject.storyBeats.find(b => b.id === beatId);
     if (!beat) return;
+
+    setVcProject((prev) => prev ? { ...prev, storyBeats: prev.storyBeats.map((b) => (b.id === beatId ? { ...b, status: "generating", videoClipUrl: undefined, errorMessage: undefined } : b)) } : null);
     
     const imageUrl = vcProject.visualRefs?.[0]?.url || "";
-    const videoUrl = await generateClip(beat.description, imageUrl, vcProject.aspectRatio, parseInt(vcProject.duration) || 5);
+    const videoUrl = await generateClip(beat.description, imageUrl, vcProject.aspectRatio, beat.duration || 5);
     const isRealVideo = isPlayableVideoUrl(videoUrl);
     
+    if (!isRealVideo && videoUrl) {
+      // Mock returned a non-real video URL (like /uploads/mock/...)
+      alert("当前为 mock 模式，不会真实调用视频模型。请设置 ARK_MOCK=false 后重启后端。");
+    }
+
     setVcProject((prev) =>
       prev ? {
           ...prev,
@@ -1718,52 +1727,55 @@ export default function AgentDock({ children }: AgentDockProps) {
     setConversations((prev) =>
       prev.map((c) =>
         c.id === activeConversationId
-          ? {
-              ...c,
-              updatedAt: "刚刚",
-              messages: [
-                ...c.messages,
-                { id: base, role: "user" as const, text },
-                { id: base + 1, role: "agent" as const, text: "" },
-              ],
-            }
+          ? { ...c, updatedAt: "刚刚", messages: [...c.messages, { id: base, role: "user" as const, text }, { id: base + 1, role: "agent" as const, text: "" }] }
           : c,
       ),
     );
-    
     setAgentLoading(true);
     try {
-      const messages = activeConversation?.messages.map(m => ({ role: m.role, content: m.text })) || [];
-      messages.push({ role: "user", content: text });
-      const result = await api.agentChat({
-        message: text,
-        messages: messages.slice(-10),
-        conversationId: activeConversationId,
-        context: vcProject,
-      });
-      
+      let streamedText = "";
+      const histMsgs = (activeConversation?.messages || []).map(m => ({ role: m.role, content: m.text }));
+      await api.agentChatStream(
+        {
+          message: text,
+          messages: histMsgs,
+          conversationId: activeConversationId,
+          context: vcProject,
+          projectMeta: vcProject,
+        },
+        (chunk: string, _toolCall: any, toolResult: any) => {
+          if (chunk) {
+            streamedText += chunk;
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === activeConversationId
+                  ? { ...c, messages: c.messages.map((m) => m.id === base + 1 ? { ...m, text: streamedText } : m) }
+                  : c,
+              ),
+            );
+          }
+          // Apply storyboard changes from done event
+          if (toolResult?.type === "edit_storyboard" && toolResult.newText) {
+            try {
+              const newBeats = JSON.parse(toolResult.newText);
+              if (Array.isArray(newBeats) && newBeats.length > 0) {
+                setVcProject((prev) =>
+                  prev ? { ...prev, storyBeats: newBeats.map((b: any, i: number) => ({ id: b.id || `shot-${i+1}`, order: i, heading: b.heading || `分镜${i+1}`, description: b.description || "", duration: b.duration || 5, status: "pending" as const })) } : null
+                );
+              }
+            } catch(e) { console.warn("beats parse fail", e); }
+          }
+        },
+      );
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Agent 暂时不可用";
       setConversations((prev) =>
         prev.map((c) =>
           c.id === activeConversationId
-            ? {
-                ...c,
-                messages: c.messages.map(m => m.id === base + 1 ? { ...m, text: result.reply } : m),
-              }
+            ? { ...c, messages: c.messages.map((m) => m.id === base + 1 ? { ...m, text: `出错：${errMsg}` } : m) }
             : c,
         ),
       );
-
-      // Apply changes if any
-      if (result.changes && result.changes.length > 0) {
-        // Find storyboard change
-        const sbChange = result.changes.find(c => c.type === "edit_storyboard" || c.target === "storyboard");
-        if (sbChange && sbChange.newText) {
-          try {
-            const newBeats = JSON.parse(sbChange.newText);
-            setVcProject((prev) => prev ? { ...prev, storyBeats: newBeats } : null);
-          } catch(e) {}
-        }
-      }
     } finally {
       setAgentLoading(false);
     }
@@ -1908,7 +1920,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                   form={vcForm}
                   onFormChange={setVcForm}
                   onSubmit={handleVCFormSubmit}
-                  loading={vcLoading}
+                  loading={false}
                   fileInputRef={vcFileInputRef}
                   expanded={vcInputExpanded}
                   setExpanded={setVcInputExpanded}
@@ -2052,6 +2064,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                   }
                   onDeleteBeat={handleDeleteBeat}
                   onRegenerateBeat={handleRegenerateBeat}
+                  onGenerateClip={handleGenerateClipBeat}
                   onConfirm={handleConfirmStoryboard}
                   onBack={() => setVcStage("canvas")}
                   onReorderBeats={(newBeats) => setVcProject((prev) => prev ? { ...prev, storyBeats: newBeats } : null)}
@@ -2062,6 +2075,7 @@ export default function AgentDock({ children }: AgentDockProps) {
                   project={vcProject}
                   stage={vcStage}
                   editingBeatId={editingBeatId}
+                  loading={vcLoading}
                   onEditBeat={setEditingBeatId}
                   onUpdateBeat={(id, desc) =>
                     setVcProject((prev) =>

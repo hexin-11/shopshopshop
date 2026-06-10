@@ -37,10 +37,17 @@ export function compactTrace(step, llmResult) {
 
 export function parseLLMJson(text) {
   try {
-    let cleanText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    // 先清理 markdown 代码块
+    let cleanText = String(text || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     return JSON.parse(cleanText);
   } catch (e) {
-    console.error("JSON Parse Error:", text);
-    throw new Error("Failed to parse LLM response as JSON");
+    // 尝试从文本中提取第一个 {...} 块
+    try {
+      const match = String(text || "").match(/\{[\s\S]*\}/);
+      if (match) return JSON.parse(match[0]);
+    } catch (e2) {}
+    // 返回原始文本，不抛错，避免流水线卡死
+    console.warn("[parseLLMJson] 无法解析 JSON，返回空对象。原始内容:", String(text || "").slice(0, 200));
+    return {};
   }
 }

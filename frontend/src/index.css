@@ -2463,6 +2463,7 @@ button, input, select, textarea { font: inherit; }
   line-height: 1.72;
   color: rgba(23, 23, 25, 0.68);
   margin: 0;
+  white-space: pre-wrap;
 }
 
 .vc-canvas-chips-row { display: flex; gap: 8px; margin-bottom: 36px; flex-wrap: wrap; }
@@ -2562,6 +2563,28 @@ button, input, select, textarea { font: inherit; }
 }
 .vc-beat-item.done { border-color: rgba(39, 174, 96, 0.22); }
 .vc-beat-item.generating { border-color: rgba(70, 132, 238, 0.35); box-shadow: 0 0 0 3px rgba(70, 132, 238, 0.06); }
+
+/* Skeleton loading shimmer */
+@keyframes vcSkeletonShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.vc-beat-skeleton {
+  animation: none;
+  border-color: rgba(23,23,25,0.06) !important;
+}
+.vc-skeleton-circle {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: vcSkeletonShimmer 1.4s ease-in-out infinite;
+}
+.vc-skeleton-line {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: vcSkeletonShimmer 1.4s ease-in-out infinite;
+  display: block;
+}
 
 .vc-beat-header { display: flex; align-items: center; gap: 10px; }
 

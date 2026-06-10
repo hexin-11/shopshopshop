@@ -5,7 +5,6 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getArkConfig, isArkMockEnabled } from "../services/arkClient.js";
 
-// Add a simple fallback class to extend ChatOpenAI for mock purposes, which naturally supports bindTools
 class MockChatModel extends ChatOpenAI {
   constructor() {
     super({ apiKey: "mock-key" });
@@ -14,25 +13,33 @@ class MockChatModel extends ChatOpenAI {
     return this;
   }
   async invoke(messages, options) {
-    // If the last message is a ToolMessage, it means the tool was already executed.
-    // We must return a plain text response to stop the agent loop.
+    // Check if the last message is a tool response
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage && lastMessage._getType() === "tool") {
+    if (lastMessage && (lastMessage._getType() === "tool" || lastMessage.name === "edit_storyboard")) {
       return new AIMessage({
-        content: "我已成功执行修改，请查看右侧画布的变化！"
+        content: "好的，我已为你修改了分镜，请查看右侧画布的变化！"
       });
     }
 
-    const text = "这是一个模拟的聊天回复，我已经为你准备好了分镜修改！";
-    return new AIMessage({ 
-      content: text,
-      tool_calls: [
-        {
-          name: "edit_storyboard",
-          args: { instruction: "修改分镜", currentStoryboard: "[]" },
-          id: "call_mock123"
-        }
-      ]
+    const userMsg = messages.findLast(m => m._getType() === "human")?.content || "";
+    const isEdit = /改|重新|加|生成|换|删|调整/.test(userMsg);
+
+    if (isEdit) {
+      return new AIMessage({ 
+        content: "没问题，我已经根据你的要求更新了分镜大纲，请确认！",
+        tool_calls: [
+          {
+            name: "edit_storyboard",
+            args: { instruction: userMsg, currentStoryboard: "[]" },
+            id: "call_mock123"
+          }
+        ]
+      });
+    }
+
+    // Default conversational response for "你好" and other chats
+    return new AIMessage({
+      content: "你好！我现在可以帮你解释当前项目状态、调整分镜、或者在真实 Ark 配置完成后创建视频生成任务。当前系统处于 MOCK 模式（ARK_MOCK=true），所以页面展示的是模拟素材，不会真实请求大模型和消耗资源。你可以尝试让我修改分镜（如：'把第一个画面改成下雨天'）。"
     });
   }
 }
